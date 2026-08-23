@@ -1,0 +1,2 @@
+import Link from "next/link"; import { ShieldX } from "lucide-react"; import { Button } from "@/components/ui/button";
+export default function AccessDenied(){return <main className="flex min-h-screen items-center justify-center p-6"><div className="max-w-md text-center"><ShieldX className="mx-auto size-12 text-primary"/><h1 className="mt-4 text-2xl font-semibold">Access Denied</h1><p className="mt-2 text-muted-foreground">You don’t have permission to view this area.</p><Button asChild className="mt-6"><Link href="/">Return to Overview</Link></Button></div></main>}

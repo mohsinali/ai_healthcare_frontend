@@ -1,0 +1,6 @@
+"use client";
+import { useEffect } from "react";
+import { usePathname, useRouter } from "next/navigation";
+import { ShieldX } from "lucide-react";
+import { useAuth } from "@/auth/auth-provider";
+export function AuthGate({ children }: { children: React.ReactNode }) { const auth = useAuth(); const router = useRouter(); const path = usePathname(); useEffect(() => { if (auth.status === "unauthenticated") router.replace(`/login?next=${encodeURIComponent(path)}`); }, [auth.status, path, router]); if (auth.status === "checking" || auth.status === "unauthenticated") return <div className="flex min-h-screen items-center justify-center"><div className="size-8 animate-spin rounded-full border-2 border-primary border-t-transparent" aria-label="Checking session" /></div>; if (auth.status === "unavailable") return <div className="flex min-h-screen items-center justify-center p-6"><div className="max-w-md text-center"><ShieldX className="mx-auto size-10 text-muted-foreground"/><h1 className="mt-4 text-2xl font-semibold">Account Access Unavailable</h1><p className="mt-2 text-muted-foreground">Your access to this application is currently unavailable. Please contact your administrator.</p></div></div>; return children; }
