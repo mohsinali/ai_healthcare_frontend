@@ -6,11 +6,14 @@ import { FormEvent, useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ArrowLeft, Plus, Save, X } from "lucide-react";
 import { tenantApiRequest } from "@/lib/api/client";
-import { ApiError } from "@/lib/api/client";
+import { mapApiFieldErrors } from "@/lib/api/errors";
 import { useTenant } from "@/tenancy/tenant-provider";
 import { AppShell } from "@/components/layout/app-shell";
 import { PageHeader } from "@/components/common/page-header";
 import { TimezoneCombobox } from "@/components/common/timezone-combobox";
+import { CountryCombobox } from "@/components/common/country-combobox";
+import { countryName } from "@/clinic/countries";
+import { normalizeInternationalPhone } from "@/patients/validation";
 import { ErrorState, LoadingState } from "@/components/feedback/states";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -64,6 +67,8 @@ export function ConfigEditor({ kind, id }: { kind: Kind; id?: string }) {
     ...empty,
   });
   const [hours, setHours] = useState<BusinessHour[]>([]);
+  const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
+  const [saveError, setSaveError] = useState<string>();
   const query = useQuery({
     queryKey: [kind.slice(0, -1), tenantId, id],
     queryFn: () =>
@@ -117,8 +122,24 @@ export function ConfigEditor({ kind, id }: { kind: Kind; id?: string }) {
       ]);
       router.push(`/${kind}/${id || value.id}`);
     },
+    onError: (error) => {
+      const mapped = mapApiFieldErrors(error, editorFields);
+      const mappedErrors = Object.fromEntries(
+        Object.entries(mapped).filter(
+          (entry): entry is [string, string] => Boolean(entry[1]),
+        ),
+      );
+      if (Object.keys(mappedErrors).length) {
+        setValidationErrors(mappedErrors);
+        setSaveError(undefined);
+        focusFirstError(mappedErrors);
+      } else {
+        setSaveError(
+          `Unable to Save ${singular[0].toUpperCase() + singular.slice(1)}. Something went wrong while saving this ${singular}. Please try again.`,
+        );
+      }
+    },
   });
-  const validationErrors = getFieldErrors(save.error);
   if (id && query.isLoading)
     return (
       <AppShell>
@@ -132,6 +153,16 @@ export function ConfigEditor({ kind, id }: { kind: Kind; id?: string }) {
       </AppShell>
     );
   const editable = canManage(tenant.tenantRole);
+  function changeField(key: string, value: FormValue) {
+    setForm((current) => ({ ...current, [key]: value }));
+    setValidationErrors((current) => {
+      if (!current[key]) return current;
+      const next = { ...current };
+      delete next[key];
+      return next;
+    });
+    setSaveError(undefined);
+  }
   function field(
     key: string,
     label: string,
@@ -152,13 +183,10 @@ export function ConfigEditor({ kind, id }: { kind: Kind; id?: string }) {
               : undefined
           }
           onChange={(e) =>
-            setForm((x) => ({
-              ...x,
-              [key]:
-                props.type === "number"
-                  ? Number(e.target.value)
-                  : e.target.value,
-            }))
+            changeField(
+              key,
+              props.type === "number" ? Number(e.target.value) : e.target.value,
+            )
           }
           {...props}
         />
@@ -172,6 +200,13 @@ export function ConfigEditor({ kind, id }: { kind: Kind; id?: string }) {
   }
   function submit(e: FormEvent) {
     e.preventDefault();
+    const next = kind === "locations" ? validateLocation(form) : {};
+    setValidationErrors(next);
+    setSaveError(undefined);
+    if (Object.keys(next).length) {
+      focusFirstError(next);
+      return;
+    }
     save.mutate();
   }
   const title = id
@@ -198,7 +233,7 @@ export function ConfigEditor({ kind, id }: { kind: Kind; id?: string }) {
               : `Create a clinic ${singular}.`
           }
         />
-        <form onSubmit={submit} className="space-y-4">
+        <form onSubmit={submit} noValidate className="space-y-4">
           <Card>
             <CardHeader>
               <CardTitle>
@@ -227,9 +262,7 @@ export function ConfigEditor({ kind, id }: { kind: Kind; id?: string }) {
                     disabled={!editable}
                     value={String(form.timezone ?? "")}
                     error={validationErrors.timezone}
-                    onChange={(timezone) =>
-                      setForm((x) => ({ ...x, timezone }))
-                    }
+                    onChange={(timezone) => changeField("timezone", timezone)}
                   />
                   {field("addressLine1", "Address Line 1", { required: true })}
                   {field("addressLine2", "Address Line 2")}
@@ -238,10 +271,14 @@ export function ConfigEditor({ kind, id }: { kind: Kind; id?: string }) {
                     required: true,
                   })}
                   {field("postalCode", "Postal Code", { required: true })}
-                  {field("countryCode", "Country", {
-                    required: true,
-                    maxLength: 2,
-                  })}
+                  <CountryCombobox
+                    id="countryCode"
+                    label="Country"
+                    disabled={!editable}
+                    value={String(form.countryCode ?? "")}
+                    error={validationErrors.countryCode}
+                    onChange={(countryCode) => changeField("countryCode", countryCode)}
+                  />
                   {field("escalationPhoneNumber", "Escalation Phone Number", {
                     placeholder: "+13055550124",
                   })}
@@ -374,8 +411,8 @@ export function ConfigEditor({ kind, id }: { kind: Kind; id?: string }) {
             </Card>
           )}
           {id && <Relations kind={kind} entityId={id} />}{" "}
-          {save.error && (
-            <p className="text-sm text-destructive">{save.error.message}</p>
+          {saveError && (
+            <p role="alert" className="text-sm text-destructive">{saveError}</p>
           )}
           {editable && (
             <div className="flex flex-wrap gap-2">
@@ -516,23 +553,47 @@ const fieldLabels: Record<string, string> = {
   status: "Status",
 };
 
-export function getFieldErrors(error: unknown): Record<string, string> {
-  if (!(error instanceof ApiError)) return {};
-  const details = error.details as { message?: string | string[] } | undefined;
-  const messages = Array.isArray(details?.message)
-    ? details.message
-    : details?.message
-      ? [details.message]
-      : [];
+const editorFields = Object.keys(fieldLabels);
+const locationFields = [
+  "name", "phone", "email", "timezone", "addressLine1", "addressLine2",
+  "city", "stateProvince", "postalCode", "countryCode",
+  "escalationPhoneNumber",
+] as const;
+
+function focusFirstError(errors: Record<string, string>) {
+  requestAnimationFrame(() => {
+    const first = locationFields.find((field) => errors[field]);
+    if (first) document.getElementById(first)?.focus({ preventScroll: false });
+  });
+}
+
+export function validateLocation(form: Record<string, FormValue>) {
   const errors: Record<string, string> = {};
-  for (const message of messages) {
-    const key = Object.keys(fieldLabels).find(
-      (candidate) =>
-        message === candidate ||
-        message.startsWith(`${candidate} `) ||
-        message.includes(`property ${candidate} `),
-    );
-    if (key) errors[key] = `${fieldLabels[key]}: ${message}`;
-  }
+  const required: [string, string][] = [
+    ["name", "Location Name is required."],
+    ["phone", "Phone is required."],
+    ["timezone", "Select a valid timezone."],
+    ["addressLine1", "Address Line 1 is required."],
+    ["city", "City is required."],
+    ["stateProvince", "State / Province is required."],
+    ["postalCode", "Postal Code is required."],
+    ["countryCode", "Select a valid country."],
+  ];
+  for (const [field, message] of required)
+    if (!String(form[field] ?? "").trim()) errors[field] = message;
+  const email = String(form.email ?? "").trim();
+  if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))
+    errors.email = "Enter a valid email address.";
+  if (!countryName(String(form.countryCode ?? "")))
+    errors.countryCode = "Select a valid country.";
+  const phone = normalizeInternationalPhone(String(form.phone ?? ""));
+  if (phone && !/^\+[1-9]\d{7,14}$/.test(phone))
+    errors.phone = "Enter a valid international phone number.";
+  const escalationPhone = normalizeInternationalPhone(
+    String(form.escalationPhoneNumber ?? ""),
+  );
+  if (escalationPhone && !/^\+[1-9]\d{7,14}$/.test(escalationPhone))
+    errors.escalationPhoneNumber =
+      "Enter a valid international phone number.";
   return errors;
 }

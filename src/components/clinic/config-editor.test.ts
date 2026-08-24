@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { ApiError } from "@/lib/api/client";
-import { getFieldErrors, payloadFor } from "./config-editor";
+import { payloadFor, validateLocation } from "./config-editor";
 
 describe("clinic configuration form validation", () => {
   it("does not send status when creating a location", () => {
@@ -49,13 +48,23 @@ describe("clinic configuration form validation", () => {
     ).toEqual({ name: "Main Clinic", status: "ACTIVE" });
   });
 
-  it("maps backend validation messages to their visible fields", () => {
-    const error = new ApiError("Validation failed", 400, {
-      message: ["phone must be shorter than or equal to 30 characters"],
-    });
-
-    expect(getFieldErrors(error)).toEqual({
-      phone: "Phone: phone must be shorter than or equal to 30 characters",
+  it("returns all client-side location field errors", () => {
+    expect(validateLocation({ ...locationInput, name: "", phone: "", email: "bad" })).toMatchObject({
+      name: "Location Name is required.",
+      phone: "Phone is required.",
+      email: "Enter a valid email address.",
     });
   });
 });
+
+const locationInput = {
+  name: "Main Clinic",
+  phone: "+13055550123",
+  email: "clinic@example.com",
+  timezone: "America/New_York",
+  addressLine1: "1 Main St",
+  city: "Miami",
+  stateProvince: "FL",
+  postalCode: "33101",
+  countryCode: "US",
+};
