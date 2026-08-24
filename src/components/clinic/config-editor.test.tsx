@@ -52,7 +52,7 @@ function renderEditor(id?: string) {
   );
 }
 
-function renderKind(kind: "providers" | "services" | "locations", id: string) {
+function renderKind(kind: "providers" | "services" | "locations", id?: string) {
   const client = new QueryClient({
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
   });
@@ -330,6 +330,79 @@ describe("unified clinic configuration edits", () => {
     const request = vi.mocked(tenantApiRequest).mock.calls[1][2];
     expect(request?.body).toContain('"serviceIds":["service-1","Services-new"]');
     expect(request?.body).toContain('"firstName":"Augusta"');
+  });
+
+  it.each([
+    [undefined, "Add Provider"],
+    ["provider-1", "Save Changes"],
+  ])("maps a structured provider phone error inline in %s mode", async (id, submitName) => {
+    const provider = {
+      id: "provider-1", firstName: "Ada", lastName: "Lovelace",
+      displayName: "Ada L.", title: "Doctor", email: "ada@example.com",
+      phone: "+13055550123", status: "ACTIVE",
+      locations: [{ id: "location-1" }], services: [{ id: "service-1" }],
+    };
+    const phoneError = new ApiError("Validation failed", 400, {
+      message: "Validation failed.",
+      errors: [{ field: "phone", message: "Enter a valid international phone number." }],
+    });
+    if (id)
+      vi.mocked(tenantApiRequest)
+        .mockResolvedValueOnce(provider as never)
+        .mockRejectedValueOnce(phoneError);
+    else vi.mocked(tenantApiRequest).mockRejectedValue(phoneError);
+    renderKind("providers", id);
+    if (id) await screen.findByDisplayValue("Ada L.");
+    else {
+      fireEvent.change(screen.getByLabelText("First Name"), { target: { value: "Ada" } });
+      fireEvent.change(screen.getByLabelText("Last Name"), { target: { value: "Lovelace" } });
+      fireEvent.change(screen.getByLabelText("Display Name"), { target: { value: "Ada L." } });
+      fireEvent.change(screen.getByLabelText("Phone"), { target: { value: "+13055550123" } });
+    }
+    if (id) {
+      fireEvent.click(screen.getByRole("button", { name: "Change Locations" }));
+      fireEvent.click(screen.getByRole("button", { name: "Change Services" }));
+    }
+    fireEvent.click(screen.getByRole("button", { name: submitName }));
+
+    expect(await screen.findByText("Enter a valid international phone number.")).toBeVisible();
+    expect(screen.getByLabelText("Phone")).toHaveAttribute("aria-invalid", "true");
+    expect(screen.getByLabelText("Phone")).toHaveClass("border-destructive");
+    expect(screen.queryByText(/Unable to Save Provider/)).not.toBeInTheDocument();
+    expect(screen.getByLabelText("First Name")).toHaveValue("Ada");
+    expect(push).not.toHaveBeenCalled();
+
+    fireEvent.change(screen.getByLabelText("Phone"), { target: { value: "+923343683084" } });
+    expect(screen.queryByText("Enter a valid international phone number.")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: submitName }));
+    if (id)
+      await waitFor(() => {
+        const request = vi.mocked(tenantApiRequest).mock.calls.at(-1)?.[2];
+        expect(request?.body).toContain('"locationIds":["location-1","Locations-new"]');
+        expect(request?.body).toContain('"serviceIds":["service-1","Services-new"]');
+      });
+  });
+
+  it("rejects provider phone gibberish client-side and clears only that error", async () => {
+    renderKind("providers");
+    fireEvent.change(screen.getByLabelText("First Name"), { target: { value: "Ada" } });
+    fireEvent.change(screen.getByLabelText("Last Name"), { target: { value: "Lovelace" } });
+    fireEvent.change(screen.getByLabelText("Phone"), { target: { value: "asdfasdf" } });
+    fireEvent.click(screen.getByRole("button", { name: "Add Provider" }));
+    expect(await screen.findByText("Enter a valid international phone number.")).toBeVisible();
+    expect(tenantApiRequest).not.toHaveBeenCalled();
+    fireEvent.change(screen.getByLabelText("Phone"), { target: { value: "+13055550123" } });
+    expect(screen.queryByText("Enter a valid international phone number.")).not.toBeInTheDocument();
+  });
+
+  it("keeps an unknown provider save failure at form level", async () => {
+    vi.mocked(tenantApiRequest).mockRejectedValue(new Error("network"));
+    renderKind("providers");
+    fireEvent.change(screen.getByLabelText("First Name"), { target: { value: "Ada" } });
+    fireEvent.change(screen.getByLabelText("Last Name"), { target: { value: "Lovelace" } });
+    fireEvent.click(screen.getByRole("button", { name: "Add Provider" }));
+    expect(await screen.findByText(/Unable to Save Provider/)).toBeVisible();
+    expect(push).not.toHaveBeenCalled();
   });
 
   it("preserves the complete service draft and does not redirect when save fails", async () => {

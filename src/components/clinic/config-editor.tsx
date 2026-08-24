@@ -611,6 +611,9 @@ export function validateEditor(kind: Kind, form: Record<string, FormValue>) {
   if (kind === "providers") {
     if (!String(form.firstName ?? "").trim()) errors.firstName = "First Name is required.";
     if (!String(form.lastName ?? "").trim()) errors.lastName = "Last Name is required.";
+    const phone = normalizeInternationalPhone(String(form.phone ?? ""));
+    if (phone && !/^\+[1-9]\d{7,14}$/.test(phone))
+      errors.phone = "Enter a valid international phone number.";
   } else {
     if (!String(form.name ?? "").trim()) errors.name = "Service Name is required.";
     const duration = Number(form.durationMinutes);

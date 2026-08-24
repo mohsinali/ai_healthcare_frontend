@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { payloadFor, validateLocation } from "./config-editor";
+import { payloadFor, validateEditor, validateLocation } from "./config-editor";
 
 describe("clinic configuration form validation", () => {
   it("does not send status when creating a location", () => {
@@ -54,6 +54,16 @@ describe("clinic configuration form validation", () => {
       phone: "Phone is required.",
       email: "Enter a valid email address.",
     });
+  });
+
+  it("rejects obvious provider phone gibberish client-side", () => {
+    expect(
+      validateEditor("providers", {
+        firstName: "Ada",
+        lastName: "Lovelace",
+        phone: "abc123xyz",
+      }),
+    ).toEqual({ phone: "Enter a valid international phone number." });
   });
 });
 
