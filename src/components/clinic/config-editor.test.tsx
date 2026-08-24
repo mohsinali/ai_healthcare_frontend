@@ -18,7 +18,11 @@ vi.mock("@/components/layout/app-shell", () => ({
   AppShell: ({ children }: { children: React.ReactNode }) => <>{children}</>,
 }));
 vi.mock("@/components/clinic/assignment-manager", () => ({
-  AssignmentManager: () => null,
+  AssignmentManager: ({ title, selected, onChange }: {
+    title: string; selected: string[]; onChange: (ids: string[]) => void;
+  }) => <button type="button" onClick={() => onChange([...selected, `${title}-new`])}>
+    Change {title}
+  </button>,
 }));
 
 const location = {
@@ -44,6 +48,17 @@ function renderEditor(id?: string) {
   return render(
     <QueryClientProvider client={client}>
       <ConfigEditor kind="locations" id={id} />
+    </QueryClientProvider>,
+  );
+}
+
+function renderKind(kind: "providers" | "services" | "locations", id: string) {
+  const client = new QueryClient({
+    defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
+  });
+  return render(
+    <QueryClientProvider client={client}>
+      <ConfigEditor kind={kind} id={id} />
     </QueryClientProvider>,
   );
 }
@@ -118,10 +133,10 @@ describe("Location timezone field", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Save Changes" }));
     await waitFor(() => expect(tenantApiRequest).toHaveBeenCalledWith(
-      "/locations/location-1",
+      "/locations/location-1/edit",
       "tenant-a",
       expect.objectContaining({
-        method: "PATCH",
+        method: "PUT",
         body: expect.stringContaining('"timezone":"Europe/London"'),
       }),
     ));
@@ -263,5 +278,74 @@ describe("Location timezone field", () => {
     expect(await screen.findByText("Enter a valid international phone number.")).toBeVisible();
     expect(screen.getByLabelText("Escalation Phone Number")).toHaveAttribute("aria-invalid", "true");
     expect(screen.getByLabelText("Phone")).toHaveAttribute("aria-invalid", "false");
+  });
+});
+
+describe("unified clinic configuration edits", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(useTenant).mockReturnValue({
+      currentTenant: { id: "tenant-a" }, tenantRole: "CLINIC_ADMIN",
+    } as ReturnType<typeof useTenant>);
+  });
+
+  it.each([
+    ["providers", { id: "provider-1", firstName: "Ada", lastName: "Lovelace", status: "ACTIVE", locations: [], services: [] }],
+    ["services", { id: "service-1", name: "Consultation", durationMinutes: 30, status: "ACTIVE", locations: [], providers: [] }],
+    ["locations", { ...location, businessHours: [], services: [], providers: [] }],
+  ] as const)("renders one submit control and no nested persistence actions for %s edit", async (kind, value) => {
+    vi.mocked(tenantApiRequest).mockResolvedValue(value as never);
+    const view = renderKind(kind, String(value.id));
+    expect(await screen.findByRole("button", { name: "Save Changes" })).toBeInTheDocument();
+    expect(view.container.querySelectorAll('form button[type="submit"], form button:not([type])')).toHaveLength(1);
+    for (const label of ["Save Assignments", "Save Locations", "Save Services", "Save Business Hours"])
+      expect(screen.queryByRole("button", { name: label })).not.toBeInTheDocument();
+  });
+
+  it("keeps provider fields and assignments local until the only Save Changes action", async () => {
+    vi.mocked(tenantApiRequest)
+      .mockResolvedValueOnce({
+        id: "provider-1", firstName: "Ada", lastName: "Lovelace",
+        displayName: null, title: null, email: null, phone: null, status: "ACTIVE",
+        locations: [{ id: "location-1" }], services: [{ id: "service-1" }],
+      } as never)
+      .mockResolvedValueOnce({ id: "provider-1" } as never);
+    renderKind("providers", "provider-1");
+    expect(await screen.findByDisplayValue("Ada")).toBeInTheDocument();
+    expect(screen.getAllByRole("button", { name: "Save Changes" })).toHaveLength(1);
+    expect(screen.queryByRole("button", { name: "Save Assignments" })).not.toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText("First Name"), { target: { value: "Augusta" } });
+    fireEvent.click(screen.getByRole("button", { name: "Change Locations" }));
+    fireEvent.click(screen.getByRole("button", { name: "Change Services" }));
+    expect(tenantApiRequest).toHaveBeenCalledTimes(1);
+
+    fireEvent.click(screen.getByRole("button", { name: "Save Changes" }));
+    await waitFor(() => expect(tenantApiRequest).toHaveBeenCalledWith(
+      "/providers/provider-1/edit", "tenant-a", expect.objectContaining({
+        method: "PUT",
+        body: expect.stringContaining('"locationIds":["location-1","Locations-new"]'),
+      }),
+    ));
+    const request = vi.mocked(tenantApiRequest).mock.calls[1][2];
+    expect(request?.body).toContain('"serviceIds":["service-1","Services-new"]');
+    expect(request?.body).toContain('"firstName":"Augusta"');
+  });
+
+  it("preserves the complete service draft and does not redirect when save fails", async () => {
+    vi.mocked(tenantApiRequest)
+      .mockResolvedValueOnce({
+        id: "service-1", name: "Consultation", description: "Initial",
+        durationMinutes: 30, status: "ACTIVE", locations: [], providers: [],
+      } as never)
+      .mockRejectedValueOnce(new Error("network"));
+    renderKind("services", "service-1");
+    expect(await screen.findByDisplayValue("Consultation")).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText("Service Name"), { target: { value: "Long Consultation" } });
+    fireEvent.click(screen.getByRole("button", { name: "Change Providers" }));
+    fireEvent.click(screen.getByRole("button", { name: "Save Changes" }));
+    expect(await screen.findByText(/Unable to Save Service/)).toBeVisible();
+    expect(screen.getByLabelText("Service Name")).toHaveValue("Long Consultation");
+    expect(push).not.toHaveBeenCalled();
   });
 });

@@ -67,6 +67,9 @@ export function ConfigEditor({ kind, id }: { kind: Kind; id?: string }) {
     ...empty,
   });
   const [hours, setHours] = useState<BusinessHour[]>([]);
+  const [locationIds, setLocationIds] = useState<string[]>([]);
+  const [providerIds, setProviderIds] = useState<string[]>([]);
+  const [serviceIds, setServiceIds] = useState<string[]>([]);
   const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
   const [saveError, setSaveError] = useState<string>();
   const query = useQuery({
@@ -80,46 +83,46 @@ export function ConfigEditor({ kind, id }: { kind: Kind; id?: string }) {
     meta: { tenantScoped: true },
   });
   useEffect(() => {
-    if (query.data)
+    if (query.data) {
       setForm({ ...empty, ...query.data } as unknown as Record<
         string,
         FormValue
       >);
+      setLocationIds("locations" in query.data ? query.data.locations?.map((x) => x.id) ?? [] : []);
+      setProviderIds("providers" in query.data ? query.data.providers?.map((x) => x.id) ?? [] : []);
+      setServiceIds("services" in query.data ? query.data.services?.map((x) => x.id) ?? [] : []);
+    }
     if (query.data && "businessHours" in query.data && query.data.businessHours)
       setHours(query.data.businessHours);
   }, [query.data]);
   const singular = kind.slice(0, -1);
   const save = useMutation({
     mutationFn: async () => {
-      const payload = payloadFor(kind, form, Boolean(id));
+      const basePayload = payloadFor(kind, form, Boolean(id));
+      const payload = id ? {
+        ...basePayload,
+        ...(kind === "providers" ? { locationIds, serviceIds } : {}),
+        ...(kind === "services" ? { locationIds, providerIds } : {}),
+        ...(kind === "locations" ? {
+          serviceIds,
+          businessHours: hours.map(({ dayOfWeek, isClosed, openTime, closeTime }) => ({
+            dayOfWeek, isClosed, openTime, closeTime,
+          })),
+        } : {}),
+      } : basePayload;
       const value = await tenantApiRequest<{ id: string }>(
-        id ? `/${kind}/${id}` : `/${kind}`,
+        id ? `/${kind}/${id}/edit` : `/${kind}`,
         tenantId,
-        { method: id ? "PATCH" : "POST", body: JSON.stringify(payload) },
+        { method: id ? "PUT" : "POST", body: JSON.stringify(payload) },
       );
-      if (kind === "locations" && id && hours.length)
-        await tenantApiRequest(`/locations/${id}/business-hours`, tenantId, {
-          method: "PUT",
-          body: JSON.stringify({
-            hours: hours.map(
-              ({ dayOfWeek, isClosed, openTime, closeTime }) => ({
-                dayOfWeek,
-                isClosed,
-                openTime,
-                closeTime,
-              }),
-            ),
-          }),
-        });
       return value;
     },
     onSuccess: async (value) => {
-      await Promise.all([
-        client.invalidateQueries({ queryKey: [kind, tenantId] }),
-        client.invalidateQueries({
-          queryKey: [kind.slice(0, -1), tenantId, id || value.id],
-        }),
-      ]);
+      await Promise.all(
+        ["locations", "location", "providers", "provider", "services", "service"].map(
+          (resource) => client.invalidateQueries({ queryKey: [resource, tenantId] }),
+        ),
+      );
       router.push(`/${kind}/${id || value.id}`);
     },
     onError: (error) => {
@@ -200,7 +203,7 @@ export function ConfigEditor({ kind, id }: { kind: Kind; id?: string }) {
   }
   function submit(e: FormEvent) {
     e.preventDefault();
-    const next = kind === "locations" ? validateLocation(form) : {};
+    const next = validateEditor(kind, form);
     setValidationErrors(next);
     setSaveError(undefined);
     if (Object.keys(next).length) {
@@ -410,7 +413,10 @@ export function ConfigEditor({ kind, id }: { kind: Kind; id?: string }) {
               </CardContent>
             </Card>
           )}
-          {id && <Relations kind={kind} entityId={id} />}{" "}
+          {id && <Relations kind={kind} editable={editable}
+            locationIds={locationIds} providerIds={providerIds} serviceIds={serviceIds}
+            onLocationsChange={setLocationIds} onProvidersChange={setProviderIds}
+            onServicesChange={setServiceIds} />}{" "}
           {saveError && (
             <p role="alert" className="text-sm text-destructive">{saveError}</p>
           )}
@@ -435,7 +441,12 @@ export function ConfigEditor({ kind, id }: { kind: Kind; id?: string }) {
     </AppShell>
   );
 }
-function Relations({ kind, entityId }: { kind: Kind; entityId: string }) {
+function Relations({ kind, editable, locationIds, providerIds, serviceIds,
+  onLocationsChange, onProvidersChange, onServicesChange }: {
+  kind: Kind; editable: boolean; locationIds: string[]; providerIds: string[]; serviceIds: string[];
+  onLocationsChange: (ids: string[]) => void; onProvidersChange: (ids: string[]) => void;
+  onServicesChange: (ids: string[]) => void;
+}) {
   return (
     <Card>
       <CardHeader>
@@ -445,42 +456,37 @@ function Relations({ kind, entityId }: { kind: Kind; entityId: string }) {
         {kind === "providers" && (
           <>
             <AssignmentManager
-              ownerType="providers"
-              ownerId={entityId}
               targetType="locations"
               title="Locations"
+              selected={locationIds} onChange={onLocationsChange} editable={editable}
             />
             <div className="border-t" />
             <AssignmentManager
-              ownerType="providers"
-              ownerId={entityId}
               targetType="services"
               title="Services"
+              selected={serviceIds} onChange={onServicesChange} editable={editable}
             />
           </>
         )}
         {kind === "locations" && (
           <AssignmentManager
-            ownerType="locations"
-            ownerId={entityId}
             targetType="services"
             title="Services"
+            selected={serviceIds} onChange={onServicesChange} editable={editable}
           />
         )}
         {kind === "services" && (
           <>
             <AssignmentManager
-              ownerType="services"
-              ownerId={entityId}
               targetType="locations"
               title="Locations"
+              selected={locationIds} onChange={onLocationsChange} editable={editable}
             />
             <div className="border-t" />
             <AssignmentManager
-              ownerType="services"
-              ownerId={entityId}
               targetType="providers"
               title="Providers"
+              selected={providerIds} onChange={onProvidersChange} editable={editable}
             />
           </>
         )}
@@ -554,7 +560,8 @@ const fieldLabels: Record<string, string> = {
 };
 
 const editorFields = Object.keys(fieldLabels);
-const locationFields = [
+const focusFields = [
+  "firstName", "lastName", "name", "description", "durationMinutes",
   "name", "phone", "email", "timezone", "addressLine1", "addressLine2",
   "city", "stateProvince", "postalCode", "countryCode",
   "escalationPhoneNumber",
@@ -562,7 +569,7 @@ const locationFields = [
 
 function focusFirstError(errors: Record<string, string>) {
   requestAnimationFrame(() => {
-    const first = locationFields.find((field) => errors[field]);
+    const first = focusFields.find((field) => errors[field]);
     if (first) document.getElementById(first)?.focus({ preventScroll: false });
   });
 }
@@ -595,5 +602,23 @@ export function validateLocation(form: Record<string, FormValue>) {
   if (escalationPhone && !/^\+[1-9]\d{7,14}$/.test(escalationPhone))
     errors.escalationPhoneNumber =
       "Enter a valid international phone number.";
+  return errors;
+}
+
+export function validateEditor(kind: Kind, form: Record<string, FormValue>) {
+  if (kind === "locations") return validateLocation(form);
+  const errors: Record<string, string> = {};
+  if (kind === "providers") {
+    if (!String(form.firstName ?? "").trim()) errors.firstName = "First Name is required.";
+    if (!String(form.lastName ?? "").trim()) errors.lastName = "Last Name is required.";
+  } else {
+    if (!String(form.name ?? "").trim()) errors.name = "Service Name is required.";
+    const duration = Number(form.durationMinutes);
+    if (!Number.isInteger(duration) || duration < 1 || duration > 1440)
+      errors.durationMinutes = "Duration must be between 1 and 1440 minutes.";
+  }
+  const email = String(form.email ?? "").trim();
+  if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))
+    errors.email = "Enter a valid email address.";
   return errors;
 }
