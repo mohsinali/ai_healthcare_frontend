@@ -15,7 +15,11 @@ const subscribe = () => () => undefined;
 
 export function ThemeSwitcher() {
   const { theme, setTheme } = useTheme();
-  const mounted = useSyncExternalStore(subscribe, () => true, () => false);
+  const mounted = useSyncExternalStore(
+    subscribe,
+    () => true,
+    () => false,
+  );
 
   return (
     <details className="group relative">

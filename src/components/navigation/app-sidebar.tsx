@@ -34,7 +34,7 @@ const clinicGroups = [
     label: "Operations",
     items: [
       { label: "Appointments", href: "#", icon: CalendarDays },
-      { label: "Patients", href: "#", icon: Users },
+      { label: "Patients", href: "/patients", icon: Users },
       { label: "Calls", href: "#", icon: Phone },
     ],
   },

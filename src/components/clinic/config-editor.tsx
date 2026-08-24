@@ -185,7 +185,9 @@ export function ConfigEditor({ kind, id }: { kind: Kind; id?: string }) {
         <Button asChild variant="ghost" size="sm">
           <Link href={id ? `/${kind}/${id}` : `/${kind}`}>
             <ArrowLeft />
-            {id ? `Back to ${String(title)}` : `Back to ${kind[0].toUpperCase() + kind.slice(1)}`}
+            {id
+              ? `Back to ${String(title)}`
+              : `Back to ${kind[0].toUpperCase() + kind.slice(1)}`}
           </Link>
         </Button>
         <PageHeader

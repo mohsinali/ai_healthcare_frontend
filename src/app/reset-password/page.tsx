@@ -15,7 +15,8 @@ export default function ResetPasswordPage() {
   const [busy, setBusy] = useState(false);
   async function submit(e: FormEvent) {
     e.preventDefault();
-    const token = new URLSearchParams(window.location.search).get("token") ?? "";
+    const token =
+      new URLSearchParams(window.location.search).get("token") ?? "";
     if (pw.length < 12) {
       setError("Password must be at least 12 characters.");
       return;

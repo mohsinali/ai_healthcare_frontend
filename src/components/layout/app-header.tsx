@@ -1,10 +1,112 @@
 "use client";
 import { useState } from "react";
-import { Bell, ChevronLeft, LogOut, Menu, PanelLeft, Search, UserRound } from "lucide-react";
+import {
+  Bell,
+  ChevronLeft,
+  LogOut,
+  Menu,
+  PanelLeft,
+  Search,
+  UserRound,
+} from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/auth/auth-provider";
 import { platformRoleLabel } from "@/auth/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ThemeSwitcher } from "@/components/navigation/theme-switcher";
-export function AppHeader({ collapsed, onToggleCollapse, onOpenMobile }: { collapsed: boolean; onToggleCollapse: () => void; onOpenMobile: () => void }) { const {user,signOut}=useAuth(); const router=useRouter(); const[open,setOpen]=useState(false); const initials=`${user?.firstName?.[0]??""}${user?.lastName?.[0]??""}`.toUpperCase(); async function logout(){await signOut();router.replace("/login")} return <header className="sticky top-0 z-30 flex h-16 items-center gap-2 border-b bg-background/95 px-4 backdrop-blur sm:px-6"><Button variant="ghost" size="icon" className="lg:hidden" onClick={onOpenMobile} aria-label="Open navigation"><Menu/></Button><Button variant="ghost" size="icon" className="hidden lg:inline-flex" onClick={onToggleCollapse} aria-label={collapsed ? "Expand navigation" : "Collapse navigation"}>{collapsed ? <PanelLeft/> : <ChevronLeft/>}</Button><div className="hidden text-sm text-muted-foreground sm:block">Workspace&nbsp; / &nbsp;<span className="font-medium text-foreground">Overview</span></div><div className="ml-auto flex items-center gap-1"><div className="relative mr-2 hidden w-56 xl:block"><Search className="absolute left-3 top-2.5 size-4 text-muted-foreground"/><Input className="h-9 bg-card pl-9" placeholder="Search workspace..." aria-label="Search workspace"/></div><Button variant="ghost" size="icon" aria-label="Notifications"><Bell/></Button><ThemeSwitcher/><div className="relative"><button onClick={()=>setOpen(!open)} className="ml-1 flex size-9 items-center justify-center rounded-full bg-accent text-sm font-semibold text-accent-foreground" aria-label="Open user menu" aria-expanded={open}>{initials}</button>{open&&<div className="absolute right-0 mt-2 w-56 rounded-md border bg-card p-2 shadow-lg"><div className="border-b px-2 py-2"><p className="truncate text-sm font-medium">{user?.firstName} {user?.lastName}</p><p className="text-xs text-muted-foreground">{platformRoleLabel(user?.platformRole??null)}</p></div><button disabled className="mt-1 flex w-full items-center gap-2 rounded px-2 py-2 text-sm text-muted-foreground disabled:opacity-60"><UserRound className="size-4"/>Account</button><button onClick={logout} className="flex w-full items-center gap-2 rounded px-2 py-2 text-sm hover:bg-muted"><LogOut className="size-4"/>Sign Out</button></div>}</div></div></header>; }
+export function AppHeader({
+  collapsed,
+  onToggleCollapse,
+  onOpenMobile,
+}: {
+  collapsed: boolean;
+  onToggleCollapse: () => void;
+  onOpenMobile: () => void;
+}) {
+  const { user, signOut } = useAuth();
+  const router = useRouter();
+  const [open, setOpen] = useState(false);
+  const initials =
+    `${user?.firstName?.[0] ?? ""}${user?.lastName?.[0] ?? ""}`.toUpperCase();
+  async function logout() {
+    await signOut();
+    router.replace("/login");
+  }
+  return (
+    <header className="sticky top-0 z-30 flex h-16 items-center gap-2 border-b bg-background/95 px-4 backdrop-blur sm:px-6">
+      <Button
+        variant="ghost"
+        size="icon"
+        className="lg:hidden"
+        onClick={onOpenMobile}
+        aria-label="Open navigation"
+      >
+        <Menu />
+      </Button>
+      <Button
+        variant="ghost"
+        size="icon"
+        className="hidden lg:inline-flex"
+        onClick={onToggleCollapse}
+        aria-label={collapsed ? "Expand navigation" : "Collapse navigation"}
+      >
+        {collapsed ? <PanelLeft /> : <ChevronLeft />}
+      </Button>
+      <div className="hidden text-sm text-muted-foreground sm:block">
+        Workspace&nbsp; / &nbsp;
+        <span className="font-medium text-foreground">Overview</span>
+      </div>
+      <div className="ml-auto flex items-center gap-1">
+        <div className="relative mr-2 hidden w-56 xl:block">
+          <Search className="absolute left-3 top-2.5 size-4 text-muted-foreground" />
+          <Input
+            className="h-9 bg-card pl-9"
+            placeholder="Search workspace..."
+            aria-label="Search workspace"
+          />
+        </div>
+        <Button variant="ghost" size="icon" aria-label="Notifications">
+          <Bell />
+        </Button>
+        <ThemeSwitcher />
+        <div className="relative">
+          <button
+            onClick={() => setOpen(!open)}
+            className="ml-1 flex size-9 items-center justify-center rounded-full bg-accent text-sm font-semibold text-accent-foreground"
+            aria-label="Open user menu"
+            aria-expanded={open}
+          >
+            {initials}
+          </button>
+          {open && (
+            <div className="absolute right-0 mt-2 w-56 rounded-md border bg-card p-2 shadow-lg">
+              <div className="border-b px-2 py-2">
+                <p className="truncate text-sm font-medium">
+                  {user?.firstName} {user?.lastName}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  {platformRoleLabel(user?.platformRole ?? null)}
+                </p>
+              </div>
+              <button
+                disabled
+                className="mt-1 flex w-full items-center gap-2 rounded px-2 py-2 text-sm text-muted-foreground disabled:opacity-60"
+              >
+                <UserRound className="size-4" />
+                Account
+              </button>
+              <button
+                onClick={logout}
+                className="flex w-full items-center gap-2 rounded px-2 py-2 text-sm hover:bg-muted"
+              >
+                <LogOut className="size-4" />
+                Sign Out
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+    </header>
+  );
+}
