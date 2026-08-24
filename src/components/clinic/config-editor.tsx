@@ -10,6 +10,7 @@ import { ApiError } from "@/lib/api/client";
 import { useTenant } from "@/tenancy/tenant-provider";
 import { AppShell } from "@/components/layout/app-shell";
 import { PageHeader } from "@/components/common/page-header";
+import { TimezoneCombobox } from "@/components/common/timezone-combobox";
 import { ErrorState, LoadingState } from "@/components/feedback/states";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -22,7 +23,6 @@ import {
   Location,
   Provider,
   Service,
-  timezoneOptions,
 } from "@/clinic/types";
 const DAYS = [
   "MONDAY",
@@ -221,22 +221,16 @@ export function ConfigEditor({ kind, id }: { kind: Kind; id?: string }) {
                     placeholder: "+13055550123",
                   })}
                   {field("email", "Email", { type: "email" })}
-                  <div className="space-y-2">
-                    <Label htmlFor="timezone">Timezone</Label>
-                    <select
-                      id="timezone"
-                      disabled={!editable}
-                      value={form.timezone ?? ""}
-                      onChange={(e) =>
-                        setForm((x) => ({ ...x, timezone: e.target.value }))
-                      }
-                      className="h-10 w-full rounded-md border bg-background px-3 text-sm"
-                    >
-                      {timezoneOptions.map((zone) => (
-                        <option key={zone}>{zone}</option>
-                      ))}
-                    </select>
-                  </div>
+                  <TimezoneCombobox
+                    id="timezone"
+                    label="Timezone"
+                    disabled={!editable}
+                    value={String(form.timezone ?? "")}
+                    error={validationErrors.timezone}
+                    onChange={(timezone) =>
+                      setForm((x) => ({ ...x, timezone }))
+                    }
+                  />
                   {field("addressLine1", "Address Line 1", { required: true })}
                   {field("addressLine2", "Address Line 2")}
                   {field("city", "City", { required: true })}
