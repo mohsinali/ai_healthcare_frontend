@@ -28,7 +28,7 @@ describe("SettingsForm", () => {
     vi.mocked(tenantApiRequest).mockResolvedValue({ dateFormat: "DD_MM_YYYY", timezone: "Asia/Karachi" });
     const client = renderForm();
     expect(await screen.findByLabelText("Date Format")).toHaveValue("DD_MM_YYYY");
-    expect(screen.getByLabelText("Tenant Timezone")).toHaveValue("Asia/Karachi");
+    expect(screen.getByRole("combobox", { name: "Tenant Timezone" })).toHaveTextContent("Asia/Karachi");
     expect(screen.getAllByRole("button", { name: "Save Changes" })).toHaveLength(1);
     expect(client.getQueryData(["settings", "tenant-a"])).toEqual({ dateFormat: "DD_MM_YYYY", timezone: "Asia/Karachi" });
   });
@@ -39,11 +39,34 @@ describe("SettingsForm", () => {
       .mockResolvedValueOnce({ dateFormat: "YYYY_MM_DD", timezone: "Asia/Karachi" });
     renderForm();
     fireEvent.change(await screen.findByLabelText("Date Format"), { target: { value: "YYYY_MM_DD" } });
-    fireEvent.change(screen.getByLabelText("Tenant Timezone"), { target: { value: "Asia/Karachi" } });
+    fireEvent.click(screen.getByRole("combobox", { name: "Tenant Timezone" }));
+    fireEvent.change(await screen.findByPlaceholderText("Search timezones..."), { target: { value: "karachi" } });
+    fireEvent.click(screen.getByRole("option", { name: "Asia/Karachi" }));
     fireEvent.click(screen.getByRole("button", { name: "Save Changes" }));
     await screen.findByText("Settings updated.");
     expect(tenantApiRequest).toHaveBeenLastCalledWith("/settings", "tenant-a", expect.objectContaining({ method: "PATCH" }));
+    expect(tenantApiRequest).toHaveBeenLastCalledWith("/settings", "tenant-a", expect.objectContaining({
+      body: JSON.stringify({ dateFormat: "YYYY_MM_DD", timezone: "Asia/Karachi" }),
+    }));
     expect(screen.getByLabelText("Date Format")).toBeInTheDocument();
+  });
+
+  it("searches underscore-separated timezone names using spaces", async () => {
+    vi.mocked(tenantApiRequest).mockResolvedValue({ dateFormat: "MM_DD_YYYY", timezone: "UTC" });
+    renderForm();
+    fireEvent.click(await screen.findByRole("combobox", { name: "Tenant Timezone" }));
+    fireEvent.change(screen.getByPlaceholderText("Search timezones..."), { target: { value: "new yo" } });
+    expect(screen.getByRole("option", { name: "America/New_York" })).toBeInTheDocument();
+    expect(screen.queryByRole("option", { name: "Asia/Karachi" })).not.toBeInTheDocument();
+  });
+
+  it("shows the empty search state and does not accept arbitrary text", async () => {
+    vi.mocked(tenantApiRequest).mockResolvedValue({ dateFormat: "MM_DD_YYYY", timezone: "UTC" });
+    renderForm();
+    fireEvent.click(await screen.findByRole("combobox", { name: "Tenant Timezone" }));
+    fireEvent.change(screen.getByPlaceholderText("Search timezones..."), { target: { value: "not a timezone" } });
+    expect(screen.getByText("No Timezones Found")).toBeInTheDocument();
+    expect(screen.getByRole("combobox", { name: "Tenant Timezone" })).toHaveTextContent("UTC");
   });
 
   it("renders field-level API errors", async () => {

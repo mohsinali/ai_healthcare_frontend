@@ -16,9 +16,11 @@
     "test:watch": "vitest"
   },
   "dependencies": {
+    "@radix-ui/react-popover": "^1.1.23",
     "@tanstack/react-query": "^5.87.1",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
+    "cmdk": "^1.1.1",
     "geist": "^1.7.2",
     "lucide-react": "^0.544.0",
     "next": "^16.0.0",
