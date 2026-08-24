@@ -1,5 +1,7 @@
 # AI Healthcare Frontend
 
+See [../MULTI_TENANCY.md](../MULTI_TENANCY.md) for tenant selection, platform versus tenant APIs, and TanStack Query key conventions.
+
 Production-oriented frontend and design-system foundation for the AI Healthcare Front Desk Voice Agent. This iteration contains static showcase data only—no authentication, PHI, domain CRUD, or backend integration.
 
 ## Requirements and local setup

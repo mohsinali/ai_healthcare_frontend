@@ -10,6 +10,10 @@ export class ApiError extends Error {
 export function configureApiAuth(config: { refresh: () => Promise<string | null> }) { refreshHandler = config.refresh; }
 export function setApiAccessToken(token: string | null) { accessToken = token; }
 
+export function tenantApiRequest<T>(path: string, tenantId: string, init: RequestInit = {}) {
+  return apiRequest<T>(path, { ...init, headers: { ...init.headers, "X-Tenant-Id": tenantId } });
+}
+
 export async function apiRequest<T>(path: string, init: RequestInit = {}, retry = true): Promise<T> {
   if (!configuredBaseUrl) throw new Error("NEXT_PUBLIC_API_BASE_URL is not configured");
   const response = await fetch(`${configuredBaseUrl}${path.startsWith("/") ? path : `/${path}`}`, {

@@ -1,4 +1,5 @@
-import { ArrowUpRight, CalendarDays, CheckCircle2, Clock3, Download, MoreHorizontal, Phone, PhoneForwarded, Plus, Save, Trash2, UserRoundCheck, Waves } from "lucide-react";
+"use client";
+import { ArrowUpRight, Building2, CalendarDays, CheckCircle2, Clock3, Download, MoreHorizontal, Phone, PhoneForwarded, Plus, Save, Trash2, UserRoundCheck, Waves } from "lucide-react";
 import { AppShell } from "@/components/layout/app-shell";
 import { PageHeader } from "@/components/common/page-header";
 import { StatusBadge } from "@/components/common/status-badge";
@@ -7,6 +8,8 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { useAuth } from "@/auth/auth-provider";
+import Link from "next/link";
 
 const metrics = [
   { label: "Total Calls", value: "48", change: "+12%", icon: Phone },
@@ -18,6 +21,8 @@ const appointments = [["09:00 AM", "Olivia Martin", "General Consultation", "Con
 const calls = [["Sarah Wilson", "2m 34s", "Appointment Booked"], ["Michael Brown", "4m 12s", "Transferred"], ["Unknown Caller", "1m 08s", "FAQ Answered"]];
 
 export default function Home() {
+  const { user } = useAuth();
+  if (user?.platformRole === "SUPER_ADMIN") return <AppShell><div className="space-y-6"><PageHeader title="Platform Overview" description="Manage organizations and platform access."/><Card><CardContent className="flex flex-col items-start p-6"><div className="rounded-lg bg-accent p-3 text-accent-foreground"><Building2/></div><h2 className="mt-4 text-lg font-semibold">Tenant Management</h2><p className="mt-1 text-sm text-muted-foreground">Create clinic organizations and manage their memberships.</p><Button asChild className="mt-4"><Link href="/tenants">View Tenants<ArrowUpRight/></Link></Button></CardContent></Card></div></AppShell>;
   return <AppShell><div className="space-y-6"><PageHeader title="Good Morning, Sarah" description="Here’s what’s happening at Sunshine Clinic today." actions={<><Button variant="outline"><Download/>Export</Button><Button><Plus/>Add Appointment</Button></>}/>
     <section aria-label="Today’s summary" className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">{metrics.map(({ label, value, change, icon: Icon }) => <Card key={label}><CardContent className="p-5"><div className="flex items-start justify-between"><div><p className="text-sm text-muted-foreground">{label}</p><p className="mt-2 text-2xl font-semibold tracking-tight">{value}</p></div><div className="rounded-md bg-accent p-2 text-accent-foreground"><Icon className="size-4"/></div></div><p className="mt-3 text-xs text-muted-foreground"><span className="font-medium text-success">{change}</span> from yesterday</p></CardContent></Card>)}</section>
     <section className="grid gap-4 xl:grid-cols-[1.65fr_1fr]"><Card><CardHeader className="flex-row items-center justify-between"><div><CardTitle>Today’s Appointments</CardTitle><CardDescription>Static schedule preview for August 23</CardDescription></div><Button variant="ghost" size="sm">View All<ArrowUpRight/></Button></CardHeader><CardContent className="overflow-x-auto"><table className="w-full min-w-[620px] text-left text-sm"><thead className="border-y bg-muted/60 text-xs text-muted-foreground"><tr><th className="px-3 py-2.5 font-medium">Time</th><th className="px-3 py-2.5 font-medium">Patient</th><th className="px-3 py-2.5 font-medium">Service</th><th className="px-3 py-2.5 font-medium">Status</th><th className="w-10"><span className="sr-only">Actions</span></th></tr></thead><tbody>{appointments.map(([time, patient, service, status]) => <tr className="border-b last:border-0 hover:bg-muted/40" key={time}><td className="px-3 py-3 font-medium">{time}</td><td className="px-3 py-3">{patient}</td><td className="px-3 py-3 text-muted-foreground">{service}</td><td className="px-3 py-3"><StatusBadge variant={status === "Pending" ? "warning" : "success"}>{status}</StatusBadge></td><td><Button variant="ghost" size="icon" aria-label={`Actions for ${patient}`}><MoreHorizontal/></Button></td></tr>)}</tbody></table></CardContent></Card>
