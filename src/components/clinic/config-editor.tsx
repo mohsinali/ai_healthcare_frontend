@@ -15,6 +15,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { AssignmentManager } from "@/components/clinic/assignment-manager";
 import {
   BusinessHour,
   canManage,
@@ -371,9 +372,7 @@ export function ConfigEditor({ kind, id }: { kind: Kind; id?: string }) {
               </CardContent>
             </Card>
           )}
-          {id && query.data && (
-            <Relations kind={kind} entity={query.data} editable={editable} />
-          )}{" "}
+          {id && <Relations kind={kind} entityId={id} />}{" "}
           {save.error && (
             <p className="text-sm text-destructive">{save.error.message}</p>
           )}
@@ -390,49 +389,54 @@ export function ConfigEditor({ kind, id }: { kind: Kind; id?: string }) {
     </AppShell>
   );
 }
-function Relations({
-  kind,
-  entity,
-}: {
-  kind: Kind;
-  entity: Location | Provider | Service;
-  editable: boolean;
-}) {
-  const items =
-    kind === "providers"
-      ? [
-          ...((entity as Provider).locations || []),
-          ...((entity as Provider).services || []),
-        ]
-      : kind === "services"
-        ? [
-            ...((entity as Service).locations || []),
-            ...((entity as Service).providers || []),
-          ]
-        : (entity as Location).services || [];
+function Relations({ kind, entityId }: { kind: Kind; entityId: string }) {
   return (
     <Card>
       <CardHeader>
         <CardTitle>Assignments</CardTitle>
       </CardHeader>
-      <CardContent>
-        {items.length ? (
-          <div className="flex flex-wrap gap-2">
-            {items.map((x) => (
-              <span
-                key={x.id}
-                className="rounded-full bg-accent px-3 py-1 text-sm text-accent-foreground"
-              >
-                {"name" in x
-                  ? x.name
-                  : x.displayName || `${x.firstName} ${x.lastName}`}
-              </span>
-            ))}
-          </div>
-        ) : (
-          <p className="text-sm text-muted-foreground">
-            No assignments configured yet.
-          </p>
+      <CardContent className="space-y-6">
+        {kind === "providers" && (
+          <>
+            <AssignmentManager
+              ownerType="providers"
+              ownerId={entityId}
+              targetType="locations"
+              title="Locations"
+            />
+            <div className="border-t" />
+            <AssignmentManager
+              ownerType="providers"
+              ownerId={entityId}
+              targetType="services"
+              title="Services"
+            />
+          </>
+        )}
+        {kind === "locations" && (
+          <AssignmentManager
+            ownerType="locations"
+            ownerId={entityId}
+            targetType="services"
+            title="Services"
+          />
+        )}
+        {kind === "services" && (
+          <>
+            <AssignmentManager
+              ownerType="services"
+              ownerId={entityId}
+              targetType="locations"
+              title="Locations"
+            />
+            <div className="border-t" />
+            <AssignmentManager
+              ownerType="services"
+              ownerId={entityId}
+              targetType="providers"
+              title="Providers"
+            />
+          </>
         )}
       </CardContent>
     </Card>
