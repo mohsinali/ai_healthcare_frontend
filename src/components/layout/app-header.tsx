@@ -1,5 +1,6 @@
 "use client";
 import { useState } from "react";
+import Link from "next/link";
 import {
   Bell,
   ChevronLeft,
@@ -89,13 +90,14 @@ export function AppHeader({
                   {platformRoleLabel(user?.platformRole ?? null)}
                 </p>
               </div>
-              <button
-                disabled
-                className="mt-1 flex w-full items-center gap-2 rounded px-2 py-2 text-sm text-muted-foreground disabled:opacity-60"
+              <Link
+                href="/account"
+                onClick={() => setOpen(false)}
+                className="mt-1 flex w-full items-center gap-2 rounded px-2 py-2 text-sm hover:bg-muted"
               >
                 <UserRound className="size-4" />
                 Account
-              </button>
+              </Link>
               <button
                 onClick={logout}
                 className="flex w-full items-center gap-2 rounded px-2 py-2 text-sm hover:bg-muted"

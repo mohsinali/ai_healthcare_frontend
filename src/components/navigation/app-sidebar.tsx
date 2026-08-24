@@ -60,7 +60,12 @@ const clinicGroups = [
       { label: "Team", href: "#", icon: UsersRound },
       { label: "Integrations", href: "#", icon: Plug },
       { label: "Audit Log", href: "#", icon: FileClock },
-      { label: "Settings", href: "#", icon: Settings },
+      {
+        label: "Settings",
+        href: "/settings",
+        icon: Settings,
+        roles: ["CLINIC_OWNER"],
+      },
     ],
   },
 ];
@@ -136,7 +141,15 @@ export function AppSidebar({
                 </p>
               )}
               <div className="space-y-0.5">
-                {group.items.map(({ label, href, icon: Icon }) => (
+                {group.items
+                  .filter(
+                    (item) =>
+                      !("roles" in item) ||
+                      (tenant.tenantRole &&
+                        Array.isArray(item.roles) &&
+                        item.roles.includes(tenant.tenantRole)),
+                  )
+                  .map(({ label, href, icon: Icon }) => (
                   <Link
                     key={label}
                     href={href}
@@ -153,7 +166,7 @@ export function AppSidebar({
                     <Icon className="size-[18px] shrink-0" strokeWidth={1.8} />
                     {!collapsed && <span>{label}</span>}
                   </Link>
-                ))}
+                  ))}
               </div>
             </div>
           ))}
@@ -181,7 +194,7 @@ export function AppSidebar({
                       <option
                         className="text-slate-900"
                         value={item.tenant.id}
-                        key={item.id}
+                        key={item.tenant.id}
                       >
                         {item.tenant.name} — {tenantRoleLabel(item.role)}
                       </option>

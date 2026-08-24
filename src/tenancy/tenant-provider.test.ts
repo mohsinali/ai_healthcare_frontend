@@ -2,7 +2,6 @@ import { describe, expect, it } from "vitest";
 import { TenantMembership } from "@/auth/types";
 import { resolveTenantSelection } from "./tenant-provider";
 const membership = (id: string): TenantMembership => ({
-  id: `membership-${id}`,
   role: "CLINIC_OWNER",
   status: "ACTIVE",
   tenant: { id, name: `Clinic ${id}`, slug: `clinic-${id}`, status: "ACTIVE" },

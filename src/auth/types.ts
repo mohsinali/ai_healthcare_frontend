@@ -10,7 +10,6 @@ export interface TenantSummary {
   status: TenantStatus;
 }
 export interface TenantMembership {
-  id: string;
   role: TenantRole;
   status: MembershipStatus;
   tenant: TenantSummary;
