@@ -9,6 +9,7 @@ export default function Page() {
       title="Services"
       description="Configure appointment types offered by the clinic."
       columns={["Service", "Duration", "Locations", "Providers"]}
+      getName={(x) => x.name}
       render={(x) => [
         <span className="flex items-center gap-2 font-medium" key="n">
           <ClipboardList className="size-4 text-primary" />

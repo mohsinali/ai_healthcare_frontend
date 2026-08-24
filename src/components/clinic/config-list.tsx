@@ -2,7 +2,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { ChevronLeft, ChevronRight, Plus, Search } from "lucide-react";
+import { ChevronLeft, ChevronRight, Pencil, Plus, Search } from "lucide-react";
 import { tenantApiRequest } from "@/lib/api/client";
 import { useTenant } from "@/tenancy/tenant-provider";
 import { AppShell } from "@/components/layout/app-shell";
@@ -27,12 +27,14 @@ export function ConfigList<T extends ListEntity>({
   description,
   columns,
   render,
+  getName,
 }: {
   kind: "locations" | "providers" | "services";
   title: string;
   description: string;
   columns: string[];
   render: (item: T) => React.ReactNode[];
+  getName: (item: T) => string;
 }) {
   const tenant = useTenant();
   const tenantId = tenant.currentTenant?.id ?? "";
@@ -143,7 +145,17 @@ export function ConfigList<T extends ListEntity>({
                         >
                           {render(item).map((cell, index) => (
                             <td className="px-4 py-3" key={index}>
-                              {cell}
+                              {index === 0 ? (
+                                <Link
+                                  href={`/${kind}/${item.id}`}
+                                  className="inline-flex rounded-sm font-medium text-foreground outline-none transition-colors hover:text-primary hover:underline focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                                  aria-label={`View ${getName(item)}`}
+                                >
+                                  {cell}
+                                </Link>
+                              ) : (
+                                cell
+                              )}
                             </td>
                           ))}
                           <td className="px-4 py-3">
@@ -156,9 +168,18 @@ export function ConfigList<T extends ListEntity>({
                             </StatusBadge>
                           </td>
                           <td className="px-4 py-3">
-                            <Button asChild variant="ghost" size="sm">
-                              <Link href={`/${kind}/${item.id}`}>View</Link>
-                            </Button>
+                            {editable ? (
+                              <Button asChild variant="ghost" size="sm">
+                                <Link href={`/${kind}/${item.id}/edit`}>
+                                  <Pencil />
+                                  Edit
+                                </Link>
+                              </Button>
+                            ) : (
+                              <Button asChild variant="ghost" size="sm">
+                                <Link href={`/${kind}/${item.id}`}>View</Link>
+                              </Button>
+                            )}
                           </td>
                         </tr>
                       ))}

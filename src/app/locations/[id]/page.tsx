@@ -1,6 +1,6 @@
 "use client";
 import { use } from "react";
-import { ConfigEditor } from "@/components/clinic/config-editor";
+import { ConfigDetail } from "@/components/clinic/config-detail";
 export default function Page({ params }: { params: Promise<{ id: string }> }) {
-  return <ConfigEditor kind="locations" id={use(params).id} />;
+  return <ConfigDetail kind="locations" id={use(params).id} />;
 }

@@ -9,6 +9,7 @@ export default function Page() {
       title="Locations"
       description="Manage clinic locations, contact details, and operating hours."
       columns={["Location", "City / State", "Timezone", "Phone"]}
+      getName={(x) => x.name}
       render={(x) => [
         <span className="flex items-center gap-2 font-medium" key="n">
           <MapPin className="size-4 text-primary" />

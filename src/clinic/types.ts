@@ -34,6 +34,9 @@ export interface Location {
   providerCount?: number;
   serviceCount?: number;
   services?: Service[];
+  providers?: Provider[];
+  createdAt?: string;
+  updatedAt?: string;
 }
 export interface Provider {
   id: string;
@@ -48,6 +51,8 @@ export interface Provider {
   serviceCount?: number;
   locations?: Location[];
   services?: Service[];
+  createdAt?: string;
+  updatedAt?: string;
 }
 export interface Service {
   id: string;
@@ -59,6 +64,8 @@ export interface Service {
   locationCount?: number;
   providers?: Provider[];
   locations?: Location[];
+  createdAt?: string;
+  updatedAt?: string;
 }
 export const canManage = (role: string | null) =>
   role === "CLINIC_OWNER" || role === "CLINIC_ADMIN";

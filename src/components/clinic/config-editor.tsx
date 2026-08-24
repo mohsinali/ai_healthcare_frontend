@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { FormEvent, useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft, Plus, Save } from "lucide-react";
+import { ArrowLeft, Plus, Save, X } from "lucide-react";
 import { tenantApiRequest } from "@/lib/api/client";
 import { ApiError } from "@/lib/api/client";
 import { useTenant } from "@/tenancy/tenant-provider";
@@ -109,8 +109,13 @@ export function ConfigEditor({ kind, id }: { kind: Kind; id?: string }) {
       return value;
     },
     onSuccess: async (value) => {
-      await client.invalidateQueries({ queryKey: [kind] });
-      if (!id) router.push(`/${kind}/${value.id}`);
+      await Promise.all([
+        client.invalidateQueries({ queryKey: [kind, tenantId] }),
+        client.invalidateQueries({
+          queryKey: [kind.slice(0, -1), tenantId, id || value.id],
+        }),
+      ]);
+      router.push(`/${kind}/${id || value.id}`);
     },
   });
   const validationErrors = getFieldErrors(save.error);
@@ -178,9 +183,9 @@ export function ConfigEditor({ kind, id }: { kind: Kind; id?: string }) {
     <AppShell>
       <div className="space-y-6">
         <Button asChild variant="ghost" size="sm">
-          <Link href={`/${kind}`}>
+          <Link href={id ? `/${kind}/${id}` : `/${kind}`}>
             <ArrowLeft />
-            Back to {kind[0].toUpperCase() + kind.slice(1)}
+            {id ? `Back to ${String(title)}` : `Back to ${kind[0].toUpperCase() + kind.slice(1)}`}
           </Link>
         </Button>
         <PageHeader
@@ -377,12 +382,20 @@ export function ConfigEditor({ kind, id }: { kind: Kind; id?: string }) {
             <p className="text-sm text-destructive">{save.error.message}</p>
           )}
           {editable && (
-            <Button loading={save.isPending}>
-              {id ? <Save /> : <Plus />}
-              {id
-                ? "Save Changes"
-                : `Add ${singular[0].toUpperCase() + singular.slice(1)}`}
-            </Button>
+            <div className="flex flex-wrap gap-2">
+              <Button loading={save.isPending}>
+                {id ? <Save /> : <Plus />}
+                {id
+                  ? "Save Changes"
+                  : `Add ${singular[0].toUpperCase() + singular.slice(1)}`}
+              </Button>
+              <Button asChild type="button" variant="outline">
+                <Link href={id ? `/${kind}/${id}` : `/${kind}`}>
+                  <X />
+                  Cancel
+                </Link>
+              </Button>
+            </div>
           )}
         </form>
       </div>
