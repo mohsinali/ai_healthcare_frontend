@@ -50,7 +50,7 @@ const clinicGroups = [
     label: "AI Front Desk",
     items: [
       { label: "Voice Agent", href: "#", icon: AudioWaveform },
-      { label: "Knowledge Base", href: "#", icon: BookOpen },
+      { label: "Knowledge Base", href: "/knowledge-base", icon: BookOpen },
       { label: "Escalation Rules", href: "#", icon: ShieldAlert },
     ],
   },
