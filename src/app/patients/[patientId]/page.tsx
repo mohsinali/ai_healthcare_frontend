@@ -3,6 +3,12 @@ import { use, useState } from "react";
 import Link from "next/link";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Pencil, UserCheck, UserX } from "lucide-react";
+import {
+  appointmentName,
+  appointmentVariant,
+  clinicDateTime,
+  PaginatedAppointments,
+} from "@/appointments/types";
 import { AppShell } from "@/components/layout/app-shell";
 import { PageHeader } from "@/components/common/page-header";
 import { StatusBadge } from "@/components/common/status-badge";
@@ -44,8 +50,17 @@ export default function Page({
   const [confirm, setConfirm] = useState(false);
   const query = useQuery({
     queryKey: ["patient", tenantId, id],
+    queryFn: () => tenantApiRequest<Patient>(`/patients/${id}`, tenantId),
+    enabled: Boolean(tenantId),
+    meta: { tenantScoped: true },
+  });
+  const appointments = useQuery({
+    queryKey: ["patient-appointments", tenantId, id, { limit: 20 }],
     queryFn: () =>
-      tenantApiRequest<Patient>(`/patients/${id}`, tenantId),
+      tenantApiRequest<PaginatedAppointments>(
+        `/appointments?patientId=${id}&limit=20`,
+        tenantId,
+      ),
     enabled: Boolean(tenantId),
     meta: { tenantScoped: true },
   });
@@ -162,6 +177,70 @@ export default function Page({
             </CardContent>
           </Card>
         </div>
+        <Card>
+          <CardContent className="p-5">
+            <div className="mb-4 flex items-center justify-between">
+              <h2 className="font-semibold">Appointments</h2>
+              <Button asChild variant="outline" size="sm">
+                <Link href="/appointments/new">Add Appointment</Link>
+              </Button>
+            </div>
+            {appointments.isLoading ? (
+              <LoadingState />
+            ) : appointments.isError ? (
+              <ErrorState />
+            ) : !appointments.data?.data.length ? (
+              <p className="text-sm text-muted-foreground">
+                No appointments found for this patient.
+              </p>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[700px] text-left text-sm">
+                  <thead className="border-b text-xs text-muted-foreground">
+                    <tr>
+                      {[
+                        "Date & Time",
+                        "Provider",
+                        "Service",
+                        "Location",
+                        "Status",
+                      ].map((x) => (
+                        <th className="py-2 pr-4 font-medium" key={x}>
+                          {x}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {appointments.data.data.map((a) => (
+                      <tr className="border-b last:border-0" key={a.id}>
+                        <td className="py-3 pr-4">
+                          <Link
+                            className="font-medium hover:underline"
+                            href={`/appointments/${a.id}`}
+                          >
+                            {clinicDateTime(a.startAt, a.timezone)}
+                          </Link>
+                        </td>
+                        <td className="py-3 pr-4">
+                          {a.provider.displayName ||
+                            `${a.provider.firstName} ${a.provider.lastName}`}
+                        </td>
+                        <td className="py-3 pr-4">{a.service.name}</td>
+                        <td className="py-3 pr-4">{a.location.name}</td>
+                        <td className="py-3">
+                          <StatusBadge variant={appointmentVariant(a.status)}>
+                            {appointmentName(a.status)}
+                          </StatusBadge>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </CardContent>
+        </Card>
       </div>
       {confirm && (
         <div

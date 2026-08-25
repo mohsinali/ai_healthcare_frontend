@@ -33,7 +33,7 @@ const clinicGroups = [
   {
     label: "Operations",
     items: [
-      { label: "Appointments", href: "#", icon: CalendarDays },
+      { label: "Appointments", href: "/appointments", icon: CalendarDays },
       { label: "Patients", href: "/patients", icon: Users },
       { label: "Calls", href: "#", icon: Phone },
     ],
@@ -150,22 +150,25 @@ export function AppSidebar({
                         item.roles.includes(tenant.tenantRole)),
                   )
                   .map(({ label, href, icon: Icon }) => (
-                  <Link
-                    key={label}
-                    href={href}
-                    title={collapsed ? label : undefined}
-                    onClick={onCloseMobile}
-                    className={cn(
-                      "flex h-9 items-center gap-3 rounded-md px-2.5 text-sm text-teal-50/80 transition-colors hover:bg-sidebar-accent hover:text-white",
-                      href !== "#" &&
-                        (pathname === href ||
-                          (href !== "/" && pathname.startsWith(href))) &&
-                        "bg-sidebar-accent text-white",
-                    )}
-                  >
-                    <Icon className="size-[18px] shrink-0" strokeWidth={1.8} />
-                    {!collapsed && <span>{label}</span>}
-                  </Link>
+                    <Link
+                      key={label}
+                      href={href}
+                      title={collapsed ? label : undefined}
+                      onClick={onCloseMobile}
+                      className={cn(
+                        "flex h-9 items-center gap-3 rounded-md px-2.5 text-sm text-teal-50/80 transition-colors hover:bg-sidebar-accent hover:text-white",
+                        href !== "#" &&
+                          (pathname === href ||
+                            (href !== "/" && pathname.startsWith(href))) &&
+                          "bg-sidebar-accent text-white",
+                      )}
+                    >
+                      <Icon
+                        className="size-[18px] shrink-0"
+                        strokeWidth={1.8}
+                      />
+                      {!collapsed && <span>{label}</span>}
+                    </Link>
                   ))}
               </div>
             </div>
