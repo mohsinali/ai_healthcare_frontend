@@ -114,6 +114,13 @@ export function ConfigDetail({ kind, id }: { kind: Kind; id: string }) {
           }
         />
         <div className="flex items-center gap-3">
+          <span className="text-sm font-medium text-muted-foreground">
+            {kind === "locations"
+              ? (entity as Location).locationNumber
+              : kind === "providers"
+                ? (entity as Provider).providerNumber
+                : (entity as Service).serviceNumber}
+          </span>
           <StatusBadge
             variant={entity.status === "ACTIVE" ? "success" : "neutral"}
           >

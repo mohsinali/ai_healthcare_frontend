@@ -13,7 +13,12 @@ export default function Page() {
       render={(x) => [
         <span className="flex items-center gap-2 font-medium" key="n">
           <Stethoscope className="size-4 text-primary" />
-          {x.displayName || `${x.firstName} ${x.lastName}`}
+          <span>
+            {x.displayName || `${x.firstName} ${x.lastName}`}
+            <span className="block text-xs font-normal text-muted-foreground">
+              {x.providerNumber}
+            </span>
+          </span>
         </span>,
         x.title || "—",
         x.locationCount ?? 0,

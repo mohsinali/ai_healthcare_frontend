@@ -61,7 +61,7 @@ export default function Page() {
             <div className="grid gap-3 border-b p-4 sm:grid-cols-[1fr_180px]">
               <Input
                 aria-label="Search patients"
-                placeholder="Search name, phone, or email"
+                placeholder="Search number, name, phone, or email"
                 value={search}
                 onChange={(e) => {
                   setSearch(e.target.value);
@@ -108,6 +108,7 @@ export default function Page() {
                     <thead className="border-b bg-muted/60 text-xs text-muted-foreground">
                       <tr>
                         {[
+                          "Patient Number",
                           "Patient",
                           "Date of Birth",
                           "Phone",
@@ -127,6 +128,9 @@ export default function Page() {
                           className="border-b last:border-0 hover:bg-muted/40"
                           key={p.id}
                         >
+                          <td className="px-4 py-3">
+                            {p.patientNumber}
+                          </td>
                           <td className="px-4 py-3">
                             <Link
                               className="inline-flex items-center gap-2 font-medium hover:text-primary hover:underline"

@@ -2,6 +2,7 @@ export type PatientStatus = "ACTIVE" | "INACTIVE";
 export type PreferredContactMethod = "PHONE" | "EMAIL";
 export interface Patient {
   id: string;
+  patientNumber: string;
   firstName: string;
   middleName: string | null;
   lastName: string;

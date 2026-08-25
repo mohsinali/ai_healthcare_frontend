@@ -18,6 +18,7 @@ export interface BusinessHour {
 }
 export interface Location {
   id: string;
+  locationNumber: string;
   name: string;
   status: ConfigStatus;
   phone: string;
@@ -40,6 +41,7 @@ export interface Location {
 }
 export interface Provider {
   id: string;
+  providerNumber: string;
   firstName: string;
   lastName: string;
   displayName: string | null;
@@ -56,6 +58,7 @@ export interface Provider {
 }
 export interface Service {
   id: string;
+  serviceNumber: string;
   name: string;
   description: string | null;
   durationMinutes: number;

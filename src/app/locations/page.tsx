@@ -13,7 +13,12 @@ export default function Page() {
       render={(x) => [
         <span className="flex items-center gap-2 font-medium" key="n">
           <MapPin className="size-4 text-primary" />
-          {x.name}
+          <span>
+            {x.name}
+            <span className="block text-xs font-normal text-muted-foreground">
+              {x.locationNumber}
+            </span>
+          </span>
         </span>,
         `${x.city}, ${x.stateProvince}`,
         x.timezone,

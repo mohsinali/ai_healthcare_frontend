@@ -97,7 +97,7 @@ export default function Page({
       <div className="mx-auto max-w-5xl space-y-6">
         <PageHeader
           title={patientName(p)}
-          description="Patient administrative record."
+          description={`${p.patientNumber} · Patient administrative record.`}
           actions={
             <div className="flex gap-2">
               {canChangePatientStatus(tenant.tenantRole) && (
