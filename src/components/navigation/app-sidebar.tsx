@@ -13,6 +13,7 @@ import {
   LayoutDashboard,
   MapPin,
   Phone,
+  PhoneCall,
   Plug,
   Settings,
   ShieldAlert,
@@ -51,6 +52,7 @@ const clinicGroups = [
     items: [
       { label: "Voice Agent", href: "#", icon: AudioWaveform },
       { label: "Knowledge Base", href: "/knowledge-base", icon: BookOpen },
+      { label: "Telephony", href: "/telephony", icon: PhoneCall },
       { label: "Escalation Rules", href: "#", icon: ShieldAlert },
     ],
   },
