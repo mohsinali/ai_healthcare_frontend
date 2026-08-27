@@ -28,28 +28,17 @@ const SESSION_API_TIMEOUT_MS = 12_000;
 export class VoiceSessionApiTimeoutError extends Error {}
 
 export async function createWebVoiceSession(widgetKey: string) {
-  logSessionDiagnostic("voice:session-api-enter");
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), SESSION_API_TIMEOUT_MS);
   try {
-    const response = await publicApiRequest<unknown>(
-      "/voice/web/session",
-      {
-        method: "POST",
-        body: JSON.stringify({ widgetKey }),
-        signal: controller.signal,
-      },
-      {
-        onHttpStart: () => logSessionDiagnostic("voice:session-http-start"),
-        onHttpResolved: (status) =>
-          logSessionDiagnostic("voice:session-http-resolved", { status }),
-        onBodyReading: () => logSessionDiagnostic("voice:session-body-reading"),
-        onBodyRead: () => logSessionDiagnostic("voice:session-body-read"),
-      },
-    );
+    // This route is deliberately outside clinic auth: the backend derives all
+    // trusted tenant/location context from the opaque public widget key.
+    const response = await publicApiRequest<unknown>("/voice/web/session", {
+      method: "POST",
+      body: JSON.stringify({ widgetKey }),
+      signal: controller.signal,
+    });
     const session = webVoiceSessionSchema.parse(response);
-    logSessionDiagnostic("voice:session-response-validated");
-    logSessionDiagnostic("voice:session-api-return");
     return session satisfies WebVoiceSession;
   } catch (error) {
     if (controller.signal.aborted) throw new VoiceSessionApiTimeoutError();
@@ -57,8 +46,4 @@ export async function createWebVoiceSession(widgetKey: string) {
   } finally {
     clearTimeout(timer);
   }
-}
-
-function logSessionDiagnostic(event: string, detail?: { status: number }) {
-  if (process.env.NODE_ENV === "development") console.info(event, detail ?? "");
 }

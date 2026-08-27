@@ -38,7 +38,6 @@ describe("createWebVoiceSession", () => {
         body: JSON.stringify({ widgetKey: "wgt_public-key" }),
         signal: expect.any(AbortSignal),
       }),
-      expect.any(Object),
     );
     const init = vi.mocked(publicApiRequest).mock.calls[0]?.[1];
     expect(init?.headers).toBeUndefined();

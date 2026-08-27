@@ -59,7 +59,9 @@ function WebVoiceCardContent() {
   const operationInFlight = useRef(false);
   const endingByUser = useRef(false);
   const mounted = useRef(true);
-  const startupTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const startupTimer = useRef<ReturnType<typeof setTimeout> | undefined>(
+    undefined,
+  );
   const startupAttempt = useRef(0);
 
   const clearStartupTimer = useCallback(() => {
@@ -113,22 +115,22 @@ function WebVoiceCardContent() {
     }
 
     try {
+      // Ask from the click handler so browser media policies see a user gesture.
+      // The temporary permission stream is stopped; ElevenLabs owns call media.
       logVoiceDiagnostic("voice:requesting-microphone");
       await requestMicrophoneAccess();
       logVoiceDiagnostic("voice:microphone-granted");
 
       const beginSession = async (attempt: number) => {
+        // Fetch, await, and use a fresh ephemeral URL for every startup attempt.
+        // Skipping the await/return at any async layer can strand the UI here.
         logVoiceDiagnostic("voice:requesting-session");
-        logVoiceDiagnostic("voice:caller-before-session-await");
         const session = await createWebVoiceSession(widgetKey);
-        logVoiceDiagnostic("voice:caller-after-session-await", {
-          hasSignedUrl:
-            typeof session?.signedUrl === "string" && Boolean(session.signedUrl.trim()),
-          hasContext:
-            typeof session?.context === "object" && session.context !== null,
-        });
         if (!mounted.current || operationId !== startupAttempt.current) return;
-        if (typeof session.signedUrl !== "string" || !session.signedUrl.trim()) {
+        if (
+          typeof session.signedUrl !== "string" ||
+          !session.signedUrl.trim()
+        ) {
           throw new ConversationStartupError();
         }
         logVoiceDiagnostic("voice:signed-session-received");
@@ -136,25 +138,23 @@ function WebVoiceCardContent() {
 
         clearStartupTimer();
         startupTimer.current = setTimeout(() => {
-          if (!mounted.current || operationId !== startupAttempt.current) return;
+          if (!mounted.current || operationId !== startupAttempt.current)
+            return;
           logVoiceDiagnostic("voice:startup-timeout");
           endSession();
           failStartup(new ConversationTimeoutError());
         }, STARTUP_TIMEOUT_MS);
 
         logVoiceDiagnostic("voice:calling-startSession");
+        // The backend issues signed conversation URLs, so this implementation
+        // explicitly uses ElevenLabs' WebSocket transport.
         startSession({
           signedUrl: session.signedUrl,
           connectionType: "websocket",
           textOnly: false,
-          onConversationCreated: (conversation) => {
-            if (!mounted.current || operationId !== startupAttempt.current) return;
-            logVoiceDiagnostic("voice:startSession-resolved", {
-              conversationId: conversation.getId(),
-            });
-          },
           onConnect: () => {
-            if (!mounted.current || operationId !== startupAttempt.current) return;
+            if (!mounted.current || operationId !== startupAttempt.current)
+              return;
             clearStartupTimer();
             operationInFlight.current = false;
             logVoiceDiagnostic("voice:onConnect");
@@ -167,12 +167,14 @@ function WebVoiceCardContent() {
             });
             clearStartupTimer();
             operationInFlight.current = false;
-            if (!mounted.current || operationId !== startupAttempt.current) return;
+            if (!mounted.current || operationId !== startupAttempt.current)
+              return;
             if (endingByUser.current) return;
             if (details.reason === "error") {
               setError({
                 title: "Call Disconnected",
-                message: "The voice connection ended unexpectedly. Please try again.",
+                message:
+                  "The voice connection ended unexpectedly. Please try again.",
               });
               setState("ERROR");
             } else {
@@ -181,7 +183,8 @@ function WebVoiceCardContent() {
             }
           },
           onError: (message, cause) => {
-            if (!mounted.current || operationId !== startupAttempt.current) return;
+            if (!mounted.current || operationId !== startupAttempt.current)
+              return;
             logVoiceError("voice:onError", message, cause);
             clearStartupTimer();
             if (attempt === 0 && isRetryableSessionError(message, cause)) {
@@ -257,7 +260,9 @@ function WebVoiceCardContent() {
             aria-hidden="true"
           />
           <div>
-            <p className="text-sm font-medium">{statusLabel(displayedState, mode)}</p>
+            <p className="text-sm font-medium">
+              {statusLabel(displayedState, mode)}
+            </p>
             <p className="text-xs text-muted-foreground">
               {statusDescription(displayedState, mode)}
             </p>
@@ -371,8 +376,6 @@ function logVoiceDiagnostic(
     conversationId?: string;
     reason?: string;
     closeCode?: number;
-    hasSignedUrl?: boolean;
-    hasContext?: boolean;
   },
 ) {
   if (process.env.NODE_ENV === "development") console.info(event, detail ?? "");
@@ -408,7 +411,9 @@ function redactVoiceError(message: string) {
 
 function isRetryableSessionError(message: string, cause: unknown) {
   const detail = `${message} ${cause instanceof Error ? cause.message : ""}`;
-  return /(?:signed|signature|authori[sz]|token|expired|\b401\b|\b403\b)/i.test(detail);
+  return /(?:signed|signature|authori[sz]|token|expired|\b401\b|\b403\b)/i.test(
+    detail,
+  );
 }
 
 function toSafeError(error: unknown): SafeError {
