@@ -118,6 +118,8 @@ WEB_WIDGET
 
 Every machine tool request re-establishes context. The language model owns only the concise FAQ `query`; it never owns tenant/location routing. See [ElevenLabs FAQ webhook tool](./elevenlabs-faq-tool.md) for dashboard configuration and verification. A short-lived signed context/session token may augment this stateless re-resolution later when complex call state exists; no `CallSession`, Redis state, or context JWT is introduced at this stage.
 
+For FAQ calls, ElevenLabs transports conversation `selected_location_key` in the dynamic `X-Voice-Selected-Location-Key` header. The backend first trusts only the tenant re-established from `X-Voice-Widget-Key`, then accepts the selected `locationNumber` only when it belongs to that tenant and is `ACTIVE`. A valid selected location overrides the WebVoiceChannel/default location; missing or blank selection uses that default; no effective location limits results to tenant-wide FAQs. Publish Agent configuration changes before testing live sessions.
+
 ## Troubleshooting
 
 For a focused development investigation, instrument or follow this sequence without logging secrets:
