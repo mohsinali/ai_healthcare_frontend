@@ -72,11 +72,9 @@ No approved match is `{ "found": false, "matches": [] }`. An unresolved tenant-w
 
 FAQ scope order is: tenant from the trusted widget-key context; valid conversation-selected location; default VoiceContext location; then tenant-wide only. A missing or blank selected-location header uses the default. A non-empty unknown, inactive, or other-tenant key is rejected with the same safe response and cannot switch tenants.
 
-## Agent prompt addition
+## Agent System Prompt
 
-Add this compact guidance to the Agent prompt:
-
-> For clinic-specific factual questions, call `search_clinic_faq`; never guess clinic-specific facts. After a location resolves successfully, treat it as the current clinic location and use it automatically for later FAQ questions without asking the caller to repeat it. If the caller changes location, use the newly resolved location. Answer only from approved FAQ results. If `found` is false, say the information is unavailable. If `requiresLocation` is true, ask which clinic location the caller means. Keep answers concise and natural, and never read JSON metadata, internal location keys, or mention records, IDs, tools, APIs, or implementation details.
+The complete production ElevenLabs System Prompt, including FAQ behavior, is maintained in [ElevenLabs System Prompt](./elevenlabs-system-prompt.md). Copy that single prompt block; do not add a separate FAQ prompt fragment.
 
 ## Real verification
 
@@ -85,7 +83,7 @@ Use synthetic/demo data only.
 1. Start the backend and frontend.
 2. expose the backend through public HTTPS or use the deployed development backend.
 3. Configure `search_clinic_faq` as above, including the machine Authorization secret and both dynamic widget and selected-location headers, then publish the Agent.
-4. Attach it to the development Agent and add the prompt guidance.
+4. Attach it to the development Agent and install the canonical [ElevenLabs System Prompt](./elevenlabs-system-prompt.md).
 5. Start a browser voice call and ask an existing FAQ, such as “Do you have parking?”
 6. Confirm ElevenLabs invokes the tool, the backend returns an approved answer, and the Agent speaks that answer naturally.
 7. With a Clifton-default widget, call the API without the selected header and confirm Clifton scope; repeat with Gulshan's `locationNumber` and confirm Gulshan plus tenant-wide scope.

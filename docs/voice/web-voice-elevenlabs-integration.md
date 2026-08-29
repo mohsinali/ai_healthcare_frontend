@@ -1,5 +1,7 @@
 # Web Voice + ElevenLabs Integration
 
+The complete production Agent prompt is maintained only in [ElevenLabs System Prompt](./elevenlabs-system-prompt.md). This document covers integration architecture and operations; it is not an alternate source of prompt rules.
+
 ## Architecture
 
 The browser voice channel starts through this trust path:
@@ -118,7 +120,7 @@ WEB_WIDGET
 
 Every machine tool request re-establishes context. The language model owns only the concise FAQ `query`; it never owns tenant/location routing. See [ElevenLabs FAQ webhook tool](./elevenlabs-faq-tool.md) for dashboard configuration and verification. A short-lived signed context/session token may augment this stateless re-resolution later when complex call state exists; no `CallSession`, Redis state, or context JWT is introduced at this stage.
 
-For FAQ calls, ElevenLabs transports conversation `selected_location_key` in the dynamic `X-Voice-Selected-Location-Key` header. The backend first trusts only the tenant re-established from `X-Voice-Widget-Key`, then accepts the selected `locationNumber` only when it belongs to that tenant and is `ACTIVE`. A valid selected location overrides the WebVoiceChannel/default location; missing or blank selection uses that default; no effective location limits results to tenant-wide FAQs. Publish Agent configuration changes before testing live sessions.
+For FAQ calls, ElevenLabs transports conversation `selected_location_key` in the dynamic `X-Voice-Selected-Location-Key` header. The backend first trusts only the tenant re-established from `X-Voice-Widget-Key`, then accepts the selected `locationNumber` only when it belongs to that tenant and is `ACTIVE`. A valid selected location overrides the WebVoiceChannel/default location; missing or blank selection uses that default; no effective location limits results to tenant-wide FAQs. Saving Agent configuration is not enough: publish changes before testing live application sessions. The complete manual prompt publishing workflow is documented in the canonical [ElevenLabs System Prompt](./elevenlabs-system-prompt.md).
 
 ## Troubleshooting
 
