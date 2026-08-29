@@ -3,7 +3,9 @@ import { publicApiRequest } from "@/lib/api/client";
 
 export interface WebVoiceSessionContext {
   tenantName: string;
+  locationKey: string | null;
   locationName: string | null;
+  locationTimezone: string | null;
   locationResolved: boolean;
   channel: "WEB_WIDGET";
 }
@@ -17,7 +19,9 @@ const webVoiceSessionSchema = z.object({
   signedUrl: z.string().min(1),
   context: z.object({
     tenantName: z.string(),
+    locationKey: z.string().nullable(),
     locationName: z.string().nullable(),
+    locationTimezone: z.string().nullable(),
     locationResolved: z.boolean(),
     channel: z.literal("WEB_WIDGET"),
   }),

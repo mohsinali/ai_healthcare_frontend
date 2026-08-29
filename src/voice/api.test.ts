@@ -8,7 +8,9 @@ const session = {
   signedUrl: "wss://signed.example/secret",
   context: {
     tenantName: "Sunshine Medical",
+    locationKey: "LOC-001",
     locationName: "Downtown",
+    locationTimezone: "Asia/Karachi",
     locationResolved: true,
     channel: "WEB_WIDGET" as const,
   },

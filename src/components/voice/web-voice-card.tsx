@@ -154,6 +154,14 @@ function WebVoiceCardContent() {
           textOnly: false,
           dynamicVariables: {
             secret__voice_widget_key: widgetKey,
+            ...(session.context.locationResolved && session.context.locationKey
+              ? {
+                  selected_location_key: session.context.locationKey,
+                  selected_location_name: session.context.locationName ?? "",
+                  selected_location_timezone:
+                    session.context.locationTimezone ?? "",
+                }
+              : {}),
           },
           onConnect: () => {
             if (!mounted.current || operationId !== startupAttempt.current)

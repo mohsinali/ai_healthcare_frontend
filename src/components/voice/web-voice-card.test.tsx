@@ -32,7 +32,9 @@ const session = {
   signedUrl: "wss://signed.example/secret-token",
   context: {
     tenantName: "Sunshine Medical",
+    locationKey: "LOC-001",
     locationName: "Downtown Clinic",
+    locationTimezone: "Asia/Karachi",
     locationResolved: true,
     channel: "WEB_WIDGET" as const,
   },
@@ -104,6 +106,9 @@ describe("WebVoiceCard", () => {
         textOnly: false,
         dynamicVariables: {
           secret__voice_widget_key: "wgt_from-environment",
+          selected_location_key: "LOC-001",
+          selected_location_name: "Downtown Clinic",
+          selected_location_timezone: "Asia/Karachi",
         },
       }),
     );
@@ -137,6 +142,27 @@ describe("WebVoiceCard", () => {
       expect.objectContaining({ signedUrl: session.signedUrl }),
     );
     expect(screen.queryByText("Connecting")).not.toBeInTheDocument();
+  });
+
+  it("leaves selected location variables unset for a tenant-wide session", async () => {
+    vi.mocked(createWebVoiceSession).mockResolvedValue({
+      ...session,
+      context: {
+        ...session.context,
+        locationKey: null,
+        locationName: null,
+        locationTimezone: null,
+        locationResolved: false,
+      },
+    });
+    render(<WebVoiceCard />);
+    fireEvent.click(screen.getByRole("button", { name: "Start a voice call" }));
+    await waitFor(() => expect(sdk.startSession).toHaveBeenCalledTimes(1));
+    const dynamicVariables = sdk.startSession.mock.calls[0][0].dynamicVariables;
+    expect(dynamicVariables).toEqual({
+      secret__voice_widget_key: "wgt_from-environment",
+    });
+    expect(dynamicVariables).not.toHaveProperty("selected_location_key");
   });
 
   it("retries one startup failure with a newly requested signed URL", async () => {
