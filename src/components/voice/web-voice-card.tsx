@@ -152,6 +152,9 @@ function WebVoiceCardContent() {
           signedUrl: session.signedUrl,
           connectionType: "websocket",
           textOnly: false,
+          dynamicVariables: {
+            secret__voice_widget_key: widgetKey,
+          },
           onConnect: () => {
             if (!mounted.current || operationId !== startupAttempt.current)
               return;

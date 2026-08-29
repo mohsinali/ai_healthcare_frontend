@@ -49,9 +49,14 @@ startSession({
   signedUrl: session.signedUrl,
   connectionType: "websocket",
   textOnly: false,
+  dynamicVariables: {
+    secret__voice_widget_key: widgetKey,
+  },
   // lifecycle callbacks
 });
 ```
+
+The installed SDK's `BaseSessionConfig` supports `dynamicVariables` as string, number, or boolean values. The runtime widget key is supplied for direct substitution into the FAQ webhook header; it is not an LLM-generated tool argument. No tenant or location database ID is sent as a dynamic variable.
 
 The backend currently produces an ElevenLabs signed conversation URL, so this implementation explicitly selects WebSocket. This is an implementation choice, not a permanent claim that WebSocket is the only supported architecture. A deliberate future WebRTC migration must adopt the appropriate ElevenLabs token/authentication flow instead of blindly reusing this signed-URL path.
 
@@ -98,6 +103,20 @@ publicWidgetKey                     calledNumber
 ```
 
 Everything after `VoiceContext` should be shared. Business tools must consume that trusted, server-resolved context and must never authorize or route work using tenant identifiers supplied by the browser, caller, prompt, or language model.
+
+After conversation startup, the FAQ tool follows a second trust-resolution path:
+
+```text
+WEB_WIDGET
+  -> runtime widget context
+  -> ElevenLabs webhook tool
+  -> Voice Gateway machine authentication
+  -> widgetKey re-resolution
+  -> trusted VoiceContext
+  -> VoiceFaqService
+```
+
+Every machine tool request re-establishes context. The language model owns only the concise FAQ `query`; it never owns tenant/location routing. See [ElevenLabs FAQ webhook tool](./elevenlabs-faq-tool.md) for dashboard configuration and verification. A short-lived signed context/session token may augment this stateless re-resolution later when complex call state exists; no `CallSession`, Redis state, or context JWT is introduced at this stage.
 
 ## Troubleshooting
 

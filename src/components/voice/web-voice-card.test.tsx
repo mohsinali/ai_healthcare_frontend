@@ -1,5 +1,11 @@
 import { StrictMode } from "react";
-import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ApiError } from "@/lib/api/client";
 import { createWebVoiceSession } from "@/voice/api";
@@ -15,7 +21,8 @@ vi.mock("@/voice/api", () => ({
   VoiceSessionApiTimeoutError: class VoiceSessionApiTimeoutError extends Error {},
 }));
 vi.mock("@elevenlabs/react", () => ({
-  ConversationProvider: ({ children }: { children: React.ReactNode }) => children,
+  ConversationProvider: ({ children }: { children: React.ReactNode }) =>
+    children,
   useConversationControls: () => sdk,
   useConversationStatus: () => ({ status: "disconnected" }),
   useConversationMode: () => ({ mode: "listening" }),
@@ -89,16 +96,20 @@ describe("WebVoiceCard", () => {
     expect(createWebVoiceSession).toHaveBeenCalledWith("wgt_from-environment");
     resolveSession(session);
 
-    await waitFor(() =>
-      expect(sdk.startSession).toHaveBeenCalledTimes(1),
-    );
+    await waitFor(() => expect(sdk.startSession).toHaveBeenCalledTimes(1));
     expect(sdk.startSession).toHaveBeenCalledWith(
       expect.objectContaining({
         signedUrl: session.signedUrl,
         connectionType: "websocket",
         textOnly: false,
+        dynamicVariables: {
+          secret__voice_widget_key: "wgt_from-environment",
+        },
       }),
     );
+    const options = sdk.startSession.mock.calls[0][0];
+    expect(options.dynamicVariables).not.toHaveProperty("tenantId");
+    expect(options.dynamicVariables).not.toHaveProperty("locationId");
     expect(screen.queryByText(session.signedUrl)).not.toBeInTheDocument();
     await screen.findByText("Listening");
     expect(screen.getByText("Sunshine Medical")).toBeInTheDocument();
@@ -205,7 +216,9 @@ describe("WebVoiceCard", () => {
 
   it("redacts a signed URL from development error diagnostics", async () => {
     vi.stubEnv("NODE_ENV", "development");
-    const errorLog = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const errorLog = vi
+      .spyOn(console, "error")
+      .mockImplementation(() => undefined);
     sdk.startSession.mockImplementation((options) =>
       options.onError?.(
         `connection failed for ${session.signedUrl}`,
@@ -260,7 +273,9 @@ describe("WebVoiceCard", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Start a voice call" }));
 
-    expect(await screen.findByText("Microphone Unavailable")).toBeInTheDocument();
+    expect(
+      await screen.findByText("Microphone Unavailable"),
+    ).toBeInTheDocument();
     expect(screen.getByText(/secure browser connection/i)).toBeInTheDocument();
     expect(createWebVoiceSession).not.toHaveBeenCalled();
   });
@@ -271,7 +286,9 @@ describe("WebVoiceCard", () => {
     render(<WebVoiceCard />);
 
     await act(async () => {
-      fireEvent.click(screen.getByRole("button", { name: "Start a voice call" }));
+      fireEvent.click(
+        screen.getByRole("button", { name: "Start a voice call" }),
+      );
       await Promise.resolve();
       await Promise.resolve();
     });
