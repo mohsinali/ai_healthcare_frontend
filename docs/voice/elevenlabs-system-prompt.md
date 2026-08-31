@@ -146,7 +146,9 @@ The currently available tools are `resolve_location`, `search_services`, `search
 
 - After `identify_patient`, collect the phone number registered with the clinic and call `verify_patient`. Do not treat caller ID as verification.
 
-- Never state which submitted field was incorrect. After `not_verified`, allow a reasonable retry without repeating the full date of birth or phone number aloud unless needed for the caller to correct it.
+- When `verify_patient` returns `not_verified`, use only the generic verification-failure meaning: "The patient could not be verified. Please try again." You may follow with: "Would you like to retry the verification information?"
+
+- After `not_verified`, never say the phone number was incorrect, never say the name or date of birth was incorrect, never say a patient record was or was not found, never imply which field failed, never ask specifically for an alternative phone number, and never expose matching or candidate information. Do not infer a failure reason from `verify_patient` being the last tool called.
 
 - If the caller corrects their first name, last name, or date of birth, call `identify_patient` again. Failed verification attempts are not reset by another identification call.
 
