@@ -154,6 +154,7 @@ function WebVoiceCardContent() {
           textOnly: false,
           dynamicVariables: {
             secret__voice_widget_key: widgetKey,
+            secret__voice_session_token: session.voiceSessionToken,
             ...(session.context.locationResolved && session.context.locationKey
               ? {
                   selected_location_key: session.context.locationKey,

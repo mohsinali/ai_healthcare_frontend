@@ -12,11 +12,13 @@ export interface WebVoiceSessionContext {
 
 export interface WebVoiceSession {
   signedUrl: string;
+  voiceSessionToken: string;
   context: WebVoiceSessionContext;
 }
 
 const webVoiceSessionSchema = z.object({
   signedUrl: z.string().min(1),
+  voiceSessionToken: z.string().regex(/^[A-Za-z0-9_-]{43}$/),
   context: z.object({
     tenantName: z.string(),
     locationKey: z.string().nullable(),

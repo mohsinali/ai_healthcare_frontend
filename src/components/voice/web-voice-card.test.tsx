@@ -30,6 +30,7 @@ vi.mock("@elevenlabs/react", () => ({
 
 const session = {
   signedUrl: "wss://signed.example/secret-token",
+  voiceSessionToken: "t".repeat(43),
   context: {
     tenantName: "Sunshine Medical",
     locationKey: "LOC-001",
@@ -106,6 +107,7 @@ describe("WebVoiceCard", () => {
         textOnly: false,
         dynamicVariables: {
           secret__voice_widget_key: "wgt_from-environment",
+          secret__voice_session_token: session.voiceSessionToken,
           selected_location_key: "LOC-001",
           selected_location_name: "Downtown Clinic",
           selected_location_timezone: "Asia/Karachi",
@@ -161,6 +163,7 @@ describe("WebVoiceCard", () => {
     const dynamicVariables = sdk.startSession.mock.calls[0][0].dynamicVariables;
     expect(dynamicVariables).toEqual({
       secret__voice_widget_key: "wgt_from-environment",
+      secret__voice_session_token: session.voiceSessionToken,
     });
     expect(dynamicVariables).not.toHaveProperty("selected_location_key");
   });

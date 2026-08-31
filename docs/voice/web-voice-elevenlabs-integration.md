@@ -53,12 +53,15 @@ startSession({
   textOnly: false,
   dynamicVariables: {
     secret__voice_widget_key: widgetKey,
+    secret__voice_session_token: session.voiceSessionToken,
   },
   // lifecycle callbacks
 });
 ```
 
-The installed SDK's `BaseSessionConfig` supports `dynamicVariables` as string, number, or boolean values. The runtime widget key is supplied for direct substitution into the FAQ webhook header; it is not an LLM-generated tool argument. No tenant or location database ID is sent as a dynamic variable.
+The installed SDK's `BaseSessionConfig` supports `dynamicVariables` as string, number, or boolean values. Both routing and session values use ElevenLabs' `secret__` prefix and are used only in webhook headers, not prompts. Configure every tool with `X-Voice-Session-Token: {{secret__voice_session_token}}`, alongside the existing bearer credential and widget header. The token remains in component memory only and is never persisted, displayed, logged, or put in a URL.
+
+The application session expires absolutely after 30 minutes by default. Each tool validates it against Redis and the freshly resolved tenant/widget context. The selected-location header remains transitional: after same-tenant active-location validation, Redis becomes authoritative for that conversation. Redis data loss requires starting a new call but cannot affect PostgreSQL business data. Live ElevenLabs testing remains pending because credits are unavailable.
 
 The backend currently produces an ElevenLabs signed conversation URL, so this implementation explicitly selects WebSocket. This is an implementation choice, not a permanent claim that WebSocket is the only supported architecture. A deliberate future WebRTC migration must adopt the appropriate ElevenLabs token/authentication flow instead of blindly reusing this signed-URL path.
 
