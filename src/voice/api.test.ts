@@ -6,6 +6,7 @@ vi.mock("@/lib/api/client", () => ({ publicApiRequest: vi.fn() }));
 
 const session = {
   signedUrl: "wss://signed.example/secret",
+  voiceSessionToken: "t".repeat(43),
   context: {
     tenantName: "Sunshine Medical",
     locationKey: "LOC-001",
