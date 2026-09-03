@@ -1,5 +1,11 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import {
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ApiError, tenantApiRequest } from "@/lib/api/client";
 import { useTenant } from "@/tenancy/tenant-provider";
@@ -79,8 +85,13 @@ describe("ProviderSchedule", () => {
   it("loads assigned locations, timezone, status, hours, sorted periods, and empty days", async () => {
     setup();
     expect(screen.getByLabelText("Loading content")).toBeVisible();
-    expect(await screen.findByText("Main Clinic")).toBeVisible();
-    expect(screen.getByText(/America\/New_York/)).toBeVisible();
+    expect(
+      await screen.findByRole("tab", { name: "Main Clinic" }),
+    ).toBeVisible();
+    expect(
+      screen.getByRole("heading", { name: "Weekly Availability Overview" }),
+    ).toBeVisible();
+    expect(screen.getAllByText(/America\/New_York/).length).toBeGreaterThan(0);
     const tabs = screen.getAllByRole("tab");
     expect(tabs).toHaveLength(2);
     expect(tabs[0]).toHaveAttribute("aria-selected", "true");
@@ -109,12 +120,35 @@ describe("ProviderSchedule", () => {
           endTime: "15:00",
           isActive: true,
         },
+      ] as never)
+      .mockResolvedValueOnce([
+        {
+          ...locations[0],
+          periods: [
+            {
+              dayOfWeek: "MONDAY",
+              startTime: "09:00",
+              endTime: "12:30",
+              isActive: true,
+            },
+            {
+              dayOfWeek: "MONDAY",
+              startTime: "13:00",
+              endTime: "15:00",
+              isActive: true,
+            },
+          ],
+        },
+        locations[1],
       ] as never);
     const { invalidations } = setup();
-    await screen.findByText("Main Clinic");
+    await screen.findByRole("tab", { name: "Main Clinic" });
     fireEvent.change(screen.getAllByLabelText(/End time, Monday period/)[0], {
       target: { value: "12:30" },
     });
+    expect(
+      within(screen.getByRole("table")).queryByText("09:00–12:30"),
+    ).not.toBeInTheDocument();
     expect(screen.getByText("Unsaved changes")).toBeVisible();
     fireEvent.click(
       screen.getByRole("button", { name: "Save Main Clinic Schedule" }),
@@ -137,13 +171,16 @@ describe("ProviderSchedule", () => {
     ).toBe(true);
     expect(body.periods[0]).not.toHaveProperty("key");
     await screen.findByText(/Availability has been updated/);
+    expect(
+      within(screen.getByRole("table")).getByText("09:00–12:30"),
+    ).toBeVisible();
     expect(invalidations).toHaveBeenCalledWith({
       queryKey: ["appointment-availability", "t1"],
     });
   });
   it("adds, removes, clears and resets only the local draft", async () => {
     setup();
-    await screen.findByText("Main Clinic");
+    await screen.findByRole("tab", { name: "Main Clinic" });
     fireEvent.click(
       screen.getAllByRole("button", { name: "Add period for Tuesday" })[0],
     );
@@ -282,7 +319,8 @@ describe("ProviderSchedule", () => {
       { ...locations[0], status: "INACTIVE" },
     ] as never);
     setup();
-    expect(await screen.findByText("Inactive location")).toBeVisible();
+    await screen.findByRole("tab", { name: "Main Clinic" });
+    expect(screen.getAllByText("Inactive location").length).toBeGreaterThan(0);
     expect(screen.getByRole("note")).toBeVisible();
     expect(
       screen.getByRole("button", { name: "Add period for Tuesday" }),
@@ -328,7 +366,7 @@ describe("ProviderSchedule", () => {
   });
   it("renders read-only controls for receptionists", async () => {
     setup("RECEPTIONIST");
-    await screen.findByText("Main Clinic");
+    await screen.findByRole("tab", { name: "Main Clinic" });
     expect(
       screen.queryByRole("button", { name: /Save Main/ }),
     ).not.toBeInTheDocument();

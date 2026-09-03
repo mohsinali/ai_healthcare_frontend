@@ -12,6 +12,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { LoadingState } from "@/components/feedback/states";
 import { StatusBadge } from "@/components/common/status-badge";
+import { WeeklyAvailabilityOverview } from "@/components/clinic/weekly-availability-overview";
 import {
   canManage,
   DayOfWeek,
@@ -272,6 +273,10 @@ export function ProviderSchedule({ providerId }: { providerId: string }) {
 
   return (
     <section className="space-y-4" aria-labelledby="provider-schedule-title">
+      <WeeklyAvailabilityOverview
+        locations={query.data}
+        onEditLocation={(locationId) => selectLocation(locationId, true)}
+      />
       <div>
         <h2 id="provider-schedule-title" className="text-xl font-semibold">
           Weekly Schedule
