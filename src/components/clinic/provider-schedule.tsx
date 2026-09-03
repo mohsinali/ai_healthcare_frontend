@@ -53,6 +53,8 @@ export function ProviderSchedule({ providerId }: { providerId: string }) {
   const editable = canManage(tenant.tenantRole);
   const qc = useQueryClient();
   const [drafts, setDrafts] = useState<DraftState>({});
+  const [selectedLocationId, setSelectedLocationId] = useState("");
+  const tabs = useRef<Record<string, HTMLButtonElement | null>>({});
   const summaries = useRef<Record<string, HTMLDivElement | null>>({});
   const query = useQuery({
     queryKey: providerScheduleQueryKey(tenantId, providerId),
@@ -67,6 +69,11 @@ export function ProviderSchedule({ providerId }: { providerId: string }) {
 
   useEffect(() => {
     if (!query.data) return;
+    setSelectedLocationId((current) =>
+      query.data!.some((location) => location.id === current)
+        ? current
+        : (query.data![0]?.id ?? ""),
+    );
     setDrafts((current) =>
       Object.fromEntries(
         query.data!.map((location) => {
@@ -232,6 +239,37 @@ export function ProviderSchedule({ providerId }: { providerId: string }) {
       </Card>
     );
 
+  const selectedLocation =
+    query.data.find((location) => location.id === selectedLocationId) ??
+    query.data[0];
+  const selectedDraft = drafts[selectedLocation.id];
+  const selectLocation = (locationId: string, focus = false) => {
+    setSelectedLocationId(locationId);
+    requestAnimationFrame(() => {
+      const tab = tabs.current[locationId];
+      tab?.scrollIntoView({
+        behavior: "smooth",
+        block: "nearest",
+        inline: "nearest",
+      });
+      if (focus) tab?.focus();
+    });
+  };
+  const navigateTabs = (
+    event: React.KeyboardEvent<HTMLButtonElement>,
+    index: number,
+  ) => {
+    let next = index;
+    if (event.key === "ArrowRight") next = (index + 1) % query.data.length;
+    else if (event.key === "ArrowLeft")
+      next = (index - 1 + query.data.length) % query.data.length;
+    else if (event.key === "Home") next = 0;
+    else if (event.key === "End") next = query.data.length - 1;
+    else return;
+    event.preventDefault();
+    selectLocation(query.data[next].id, true);
+  };
+
   return (
     <section className="space-y-4" aria-labelledby="provider-schedule-title">
       <div>
@@ -243,135 +281,182 @@ export function ProviderSchedule({ providerId }: { providerId: string }) {
           availability.
         </p>
       </div>
-      {query.data.map((location) => {
-        const draft = drafts[location.id];
-        if (!draft) return null;
-        const pending =
-          save.isPending && save.variables?.locationId === location.id;
-        return (
-          <Card key={location.id}>
-            <CardHeader className="gap-2 sm:flex-row sm:items-start sm:justify-between">
-              <div>
-                <CardTitle>{location.name}</CardTitle>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  Timezone:{" "}
-                  <span className="font-medium text-foreground">
-                    {location.timezone}
-                  </span>{" "}
-                  · Times below are local
-                </p>
-              </div>
-              <div className="flex items-center gap-2">
-                <StatusBadge
-                  variant={location.status === "ACTIVE" ? "success" : "neutral"}
-                >
-                  {location.status === "ACTIVE"
-                    ? "Active location"
-                    : "Inactive location"}
-                </StatusBadge>
-                {draft.dirty && (
-                  <span className="text-sm font-medium">Unsaved changes</span>
-                )}
-              </div>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {location.status === "INACTIVE" && (
-                <p
-                  role="note"
-                  className="rounded-md border border-amber-500/40 bg-amber-500/10 p-3 text-sm"
-                >
-                  This location is inactive. The provider cannot receive
-                  availability here. Existing periods may only be removed or
-                  deactivated.
-                </p>
+      <div
+        role="tablist"
+        aria-label="Provider schedule locations"
+        className="flex max-w-full gap-2 overflow-x-auto border-b pb-2"
+      >
+        {query.data.map((location, index) => {
+          const selected = location.id === selectedLocation.id;
+          const dirty = drafts[location.id]?.dirty;
+          return (
+            <button
+              key={location.id}
+              ref={(node) => {
+                tabs.current[location.id] = node;
+              }}
+              id={`schedule-tab-${location.id}`}
+              type="button"
+              role="tab"
+              aria-selected={selected}
+              aria-controls={`schedule-panel-${location.id}`}
+              aria-label={`${location.name}${dirty ? ", Unsaved changes" : ""}`}
+              tabIndex={selected ? 0 : -1}
+              className={`shrink-0 rounded-t-md border px-4 py-2 text-sm font-medium outline-none focus-visible:ring-2 focus-visible:ring-ring ${selected ? "border-primary bg-accent text-accent-foreground" : "border-transparent text-muted-foreground hover:bg-muted hover:text-foreground"}`}
+              onClick={() => selectLocation(location.id)}
+              onKeyDown={(event) => navigateTabs(event, index)}
+            >
+              {location.name}
+              {dirty && (
+                <span className="ml-2 whitespace-nowrap text-xs font-semibold">
+                  • Unsaved
+                </span>
               )}
-              {draft.errors.summary && (
-                <div
-                  ref={(node) => {
-                    summaries.current[location.id] = node;
-                  }}
-                  tabIndex={-1}
-                  role="alert"
-                  className="rounded-md bg-destructive/10 p-3 text-sm text-destructive"
-                >
-                  <p className="font-medium">Schedule could not be saved</p>
-                  <ul className="mt-1 list-disc pl-5">
-                    {draft.errors.summary.map((message) => (
-                      <li key={message}>{message}</li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-              {draft.success && (
-                <p
-                  role="status"
-                  className="rounded-md bg-emerald-500/10 p-3 text-sm text-emerald-700 dark:text-emerald-300"
-                >
-                  {draft.success}
-                </p>
-              )}
-              <div className="space-y-3">
-                {WEEKDAYS.map((day) => (
-                  <DayEditor
-                    key={day}
-                    day={day}
-                    location={location}
-                    periods={draft.periods.filter(
-                      (period) => period.dayOfWeek === day,
+            </button>
+          );
+        })}
+      </div>
+      {selectedDraft &&
+        (() => {
+          const location = selectedLocation;
+          const draft = selectedDraft;
+          const pending =
+            save.isPending && save.variables?.locationId === location.id;
+          return (
+            <div
+              id={`schedule-panel-${location.id}`}
+              role="tabpanel"
+              aria-labelledby={`schedule-tab-${location.id}`}
+              tabIndex={0}
+            >
+              <Card>
+                <CardHeader className="gap-2 sm:flex-row sm:items-start sm:justify-between">
+                  <div>
+                    <CardTitle>{location.name}</CardTitle>
+                    <p className="mt-1 text-sm text-muted-foreground">
+                      Timezone:{" "}
+                      <span className="font-medium text-foreground">
+                        {location.timezone}
+                      </span>{" "}
+                      · Times below are local
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <StatusBadge
+                      variant={
+                        location.status === "ACTIVE" ? "success" : "neutral"
+                      }
+                    >
+                      {location.status === "ACTIVE"
+                        ? "Active location"
+                        : "Inactive location"}
+                    </StatusBadge>
+                    {draft.dirty && (
+                      <span className="text-sm font-medium">
+                        Unsaved changes
+                      </span>
                     )}
-                    errors={draft.errors}
-                    editable={editable}
-                    onChange={(change) =>
-                      update(location.id, (periods) => change(periods))
-                    }
-                  />
-                ))}
-              </div>
-              {editable && (
-                <div className="flex flex-wrap gap-2 border-t pt-4">
-                  <Button
-                    type="button"
-                    loading={pending}
-                    disabled={!draft.dirty || save.isPending}
-                    onClick={() => submit(location)}
-                  >
-                    <Save />
-                    Save {location.name} Schedule
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    disabled={!draft.dirty || pending}
-                    onClick={() =>
-                      setDrafts((current) => ({
-                        ...current,
-                        [location.id]: {
-                          periods: toDraft(draft.baseline),
-                          baseline: draft.baseline,
-                          dirty: false,
-                          errors: {},
-                        },
-                      }))
-                    }
-                  >
-                    <RotateCcw />
-                    Cancel Changes
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="destructive"
-                    disabled={!draft.periods.length || pending}
-                    onClick={() => update(location.id, () => [])}
-                  >
-                    <Trash2 />
-                    Clear Schedule
-                  </Button>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        );
-      })}
+                  </div>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {location.status === "INACTIVE" && (
+                    <p
+                      role="note"
+                      className="rounded-md border border-amber-500/40 bg-amber-500/10 p-3 text-sm"
+                    >
+                      This location is inactive. The provider cannot receive
+                      availability here. Existing periods may only be removed or
+                      deactivated.
+                    </p>
+                  )}
+                  {draft.errors.summary && (
+                    <div
+                      ref={(node) => {
+                        summaries.current[location.id] = node;
+                      }}
+                      tabIndex={-1}
+                      role="alert"
+                      className="rounded-md bg-destructive/10 p-3 text-sm text-destructive"
+                    >
+                      <p className="font-medium">Schedule could not be saved</p>
+                      <ul className="mt-1 list-disc pl-5">
+                        {draft.errors.summary.map((message) => (
+                          <li key={message}>{message}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                  {draft.success && (
+                    <p
+                      role="status"
+                      className="rounded-md bg-emerald-500/10 p-3 text-sm text-emerald-700 dark:text-emerald-300"
+                    >
+                      {draft.success}
+                    </p>
+                  )}
+                  <div className="space-y-3">
+                    {WEEKDAYS.map((day) => (
+                      <DayEditor
+                        key={day}
+                        day={day}
+                        location={location}
+                        periods={draft.periods.filter(
+                          (period) => period.dayOfWeek === day,
+                        )}
+                        errors={draft.errors}
+                        editable={editable}
+                        onChange={(change) =>
+                          update(location.id, (periods) => change(periods))
+                        }
+                      />
+                    ))}
+                  </div>
+                  {editable && (
+                    <div className="flex flex-wrap gap-2 border-t pt-4">
+                      <Button
+                        type="button"
+                        loading={pending}
+                        disabled={!draft.dirty || save.isPending}
+                        onClick={() => submit(location)}
+                      >
+                        <Save />
+                        Save {location.name} Schedule
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        disabled={!draft.dirty || pending}
+                        onClick={() =>
+                          setDrafts((current) => ({
+                            ...current,
+                            [location.id]: {
+                              periods: toDraft(draft.baseline),
+                              baseline: draft.baseline,
+                              dirty: false,
+                              errors: {},
+                            },
+                          }))
+                        }
+                      >
+                        <RotateCcw />
+                        Cancel Changes
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="destructive"
+                        disabled={!draft.periods.length || pending}
+                        onClick={() => update(location.id, () => [])}
+                      >
+                        <Trash2 />
+                        Clear Schedule
+                      </Button>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+          );
+        })()}
     </section>
   );
 }

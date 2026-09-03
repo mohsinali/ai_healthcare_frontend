@@ -1,7 +1,7 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { tenantApiRequest } from "@/lib/api/client";
+import { ApiError, tenantApiRequest } from "@/lib/api/client";
 import { useTenant } from "@/tenancy/tenant-provider";
 import { ProviderSchedule } from "./provider-schedule";
 
@@ -44,7 +44,14 @@ const locations = [
     name: "West Clinic",
     timezone: "America/Chicago",
     status: "ACTIVE",
-    businessHours: [],
+    businessHours: [
+      {
+        dayOfWeek: "MONDAY",
+        isClosed: false,
+        openTime: "09:00",
+        closeTime: "17:00",
+      },
+    ],
     periods: [],
   },
 ];
@@ -62,7 +69,7 @@ function setup(role = "CLINIC_ADMIN") {
       <ProviderSchedule providerId="p1" />
     </QueryClientProvider>,
   );
-  return invalidations;
+  return { client, invalidations };
 }
 describe("ProviderSchedule", () => {
   beforeEach(() => {
@@ -74,7 +81,12 @@ describe("ProviderSchedule", () => {
     expect(screen.getByLabelText("Loading content")).toBeVisible();
     expect(await screen.findByText("Main Clinic")).toBeVisible();
     expect(screen.getByText(/America\/New_York/)).toBeVisible();
-    expect(screen.getAllByText("Active location")).toHaveLength(2);
+    const tabs = screen.getAllByRole("tab");
+    expect(tabs).toHaveLength(2);
+    expect(tabs[0]).toHaveAttribute("aria-selected", "true");
+    expect(tabs[1]).toHaveAttribute("aria-selected", "false");
+    expect(screen.getByRole("tabpanel")).toHaveAccessibleName("Main Clinic");
+    expect(screen.getAllByText("Active location")).toHaveLength(1);
     expect(screen.getByText("Location hours: 09:00–17:00")).toBeVisible();
     const starts = screen.getAllByLabelText(/Start time, Monday period/);
     expect(starts[0]).toHaveValue("09:00");
@@ -98,7 +110,7 @@ describe("ProviderSchedule", () => {
           isActive: true,
         },
       ] as never);
-    const invalidations = setup();
+    const { invalidations } = setup();
     await screen.findByText("Main Clinic");
     fireEvent.change(screen.getAllByLabelText(/End time, Monday period/)[0], {
       target: { value: "12:30" },
@@ -155,6 +167,165 @@ describe("ProviderSchedule", () => {
     );
     expect(screen.queryByText("Unsaved changes")).not.toBeInTheDocument();
   });
+  it("switches tabs without requests and preserves accessible unsaved drafts", async () => {
+    setup();
+    await screen.findByRole("tab", { name: "Main Clinic" });
+    expect(tenantApiRequest).toHaveBeenCalledTimes(1);
+    fireEvent.change(screen.getByLabelText("End time, Monday period 1"), {
+      target: { value: "11:45" },
+    });
+    expect(
+      screen.getByRole("tab", { name: /Main Clinic, Unsaved changes/ }),
+    ).toHaveTextContent("Unsaved");
+
+    fireEvent.click(screen.getByRole("tab", { name: "West Clinic" }));
+    expect(screen.getByRole("tabpanel")).toHaveAccessibleName("West Clinic");
+    expect(
+      screen.queryByLabelText(/Start time, Monday/),
+    ).not.toBeInTheDocument();
+    expect(tenantApiRequest).toHaveBeenCalledTimes(1);
+
+    fireEvent.click(
+      screen.getByRole("tab", { name: /Main Clinic, Unsaved changes/ }),
+    );
+    expect(screen.getByLabelText("End time, Monday period 1")).toHaveValue(
+      "11:45",
+    );
+    expect(tenantApiRequest).toHaveBeenCalledTimes(1);
+  });
+  it("keeps another location dirty when the selected location is reset", async () => {
+    setup();
+    await screen.findByRole("tab", { name: "Main Clinic" });
+    fireEvent.change(screen.getByLabelText("End time, Monday period 1"), {
+      target: { value: "11:45" },
+    });
+    fireEvent.click(screen.getByRole("tab", { name: "West Clinic" }));
+    fireEvent.click(
+      screen.getByRole("button", { name: "Add period for Monday" }),
+    );
+    expect(
+      screen.getByRole("tab", { name: /West Clinic, Unsaved changes/ }),
+    ).toBeVisible();
+    fireEvent.click(screen.getByRole("button", { name: "Cancel Changes" }));
+    expect(screen.getByRole("tab", { name: "West Clinic" })).toBeVisible();
+    expect(
+      screen.getByRole("tab", { name: /Main Clinic, Unsaved changes/ }),
+    ).toBeVisible();
+  });
+  it("saving the selected location preserves another location's unsaved draft", async () => {
+    vi.mocked(tenantApiRequest)
+      .mockResolvedValueOnce(locations as never)
+      .mockResolvedValueOnce([
+        {
+          dayOfWeek: "MONDAY",
+          startTime: "09:00",
+          endTime: "17:00",
+          isActive: true,
+        },
+      ] as never);
+    setup();
+    await screen.findByRole("tab", { name: "Main Clinic" });
+    fireEvent.change(screen.getByLabelText("End time, Monday period 1"), {
+      target: { value: "11:45" },
+    });
+    fireEvent.click(screen.getByRole("tab", { name: "West Clinic" }));
+    fireEvent.click(
+      screen.getByRole("button", { name: "Add period for Monday" }),
+    );
+    fireEvent.click(
+      screen.getByRole("button", { name: "Save West Clinic Schedule" }),
+    );
+    await screen.findByText(/Availability has been updated/);
+    expect(screen.getByRole("tab", { name: "West Clinic" })).toBeVisible();
+    fireEvent.click(
+      screen.getByRole("tab", { name: /Main Clinic, Unsaved changes/ }),
+    );
+    expect(screen.getByLabelText("End time, Monday period 1")).toHaveValue(
+      "11:45",
+    );
+  });
+  it("preserves the selected draft after a failed save", async () => {
+    vi.mocked(tenantApiRequest)
+      .mockResolvedValueOnce(locations as never)
+      .mockRejectedValueOnce(
+        new ApiError("invalid", 400, {
+          code: "PROVIDER_PERIOD_OUTSIDE_LOCATION_HOURS",
+          conflicts: [
+            {
+              dayOfWeek: "MONDAY",
+              startTime: "13:00",
+              endTime: "16:30",
+              proposedOpenTime: "09:00",
+              proposedCloseTime: "17:00",
+            },
+          ],
+        }),
+      );
+    setup();
+    await screen.findByRole("tab", { name: "Main Clinic" });
+    fireEvent.change(screen.getByLabelText("End time, Monday period 2"), {
+      target: { value: "16:30" },
+    });
+    fireEvent.click(
+      screen.getByRole("button", { name: "Save Main Clinic Schedule" }),
+    );
+    expect(await screen.findByRole("alert")).toBeVisible();
+    expect(screen.getByLabelText("End time, Monday period 2")).toHaveValue(
+      "16:30",
+    );
+    expect(
+      screen.getByRole("tab", { name: /Main Clinic, Unsaved changes/ }),
+    ).toBeVisible();
+  });
+  it("keeps inactive locations viewable but prevents active schedule creation", async () => {
+    vi.mocked(tenantApiRequest).mockResolvedValue([
+      { ...locations[0], status: "INACTIVE" },
+    ] as never);
+    setup();
+    expect(await screen.findByText("Inactive location")).toBeVisible();
+    expect(screen.getByRole("note")).toBeVisible();
+    expect(
+      screen.getByRole("button", { name: "Add period for Tuesday" }),
+    ).toBeDisabled();
+    expect(screen.getByLabelText("Start time, Monday period 1")).toBeDisabled();
+    expect(screen.getByLabelText("Deactivate Monday period 1")).toBeEnabled();
+  });
+  it("uses a horizontally scrollable tab list for many locations", async () => {
+    vi.mocked(tenantApiRequest).mockResolvedValue(
+      Array.from({ length: 12 }, (_, index) => ({
+        ...locations[1],
+        id: `l-${index}`,
+        name: `Clinic ${index + 1}`,
+      })) as never,
+    );
+    setup();
+    const tablist = await screen.findByRole("tablist", {
+      name: "Provider schedule locations",
+    });
+    expect(tablist).toHaveClass("overflow-x-auto");
+    expect(screen.getAllByRole("tab")).toHaveLength(12);
+    expect(screen.getAllByRole("tabpanel")).toHaveLength(1);
+  });
+  it("supports arrow-key navigation and selects a remaining assignment after refresh", async () => {
+    const { client } = setup();
+    const first = await screen.findByRole("tab", { name: "Main Clinic" });
+    fireEvent.keyDown(first, { key: "ArrowRight" });
+    expect(screen.getByRole("tab", { name: "West Clinic" })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
+    client.setQueryData(
+      ["provider-working-periods", "t1", "p1"],
+      [locations[0]],
+    );
+    await waitFor(() =>
+      expect(screen.getByRole("tab", { name: "Main Clinic" })).toHaveAttribute(
+        "aria-selected",
+        "true",
+      ),
+    );
+    expect(screen.getAllByRole("tab")).toHaveLength(1);
+  });
   it("renders read-only controls for receptionists", async () => {
     setup("RECEPTIONIST");
     await screen.findByText("Main Clinic");
@@ -165,6 +336,8 @@ describe("ProviderSchedule", () => {
       screen.queryByRole("button", { name: /Add period/ }),
     ).not.toBeInTheDocument();
     expect(screen.getAllByLabelText(/Start time/)[0]).toBeDisabled();
+    fireEvent.click(screen.getByRole("tab", { name: "West Clinic" }));
+    expect(screen.getByRole("tabpanel")).toHaveAccessibleName("West Clinic");
   });
   it("shows an assignment action when no locations exist", async () => {
     vi.mocked(tenantApiRequest).mockResolvedValue([] as never);
