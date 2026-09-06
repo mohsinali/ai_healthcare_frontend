@@ -14,7 +14,8 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { ApiError, tenantApiRequest } from "@/lib/api/client";
+import { tenantApiRequest } from "@/lib/api/client";
+import { isAppointmentSlotConflict } from "@/appointments/conflicts";
 import { Patient, PaginatedPatients, patientName } from "@/patients/types";
 import { useTenant } from "@/tenancy/tenant-provider";
 
@@ -197,7 +198,7 @@ export function AppointmentForm({
       router.push(`/appointments/${a.id}`);
     },
     onError: async (error) => {
-      if ((error as ApiError).status === 409) {
+      if (isAppointmentSlotConflict(error)) {
         set("start", "");
         setGeneral(
           "That time is no longer available. Please choose another time.",

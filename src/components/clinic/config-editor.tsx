@@ -20,6 +20,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { AssignmentManager } from "@/components/clinic/assignment-manager";
+import { locationHoursConflictMessage } from "@/clinic/schedules";
 import {
   BusinessHour,
   canManage,
@@ -70,7 +71,9 @@ export function ConfigEditor({ kind, id }: { kind: Kind; id?: string }) {
   const [locationIds, setLocationIds] = useState<string[]>([]);
   const [providerIds, setProviderIds] = useState<string[]>([]);
   const [serviceIds, setServiceIds] = useState<string[]>([]);
-  const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
+  const [validationErrors, setValidationErrors] = useState<
+    Record<string, string>
+  >({});
   const [saveError, setSaveError] = useState<string>();
   const query = useQuery({
     queryKey: [kind.slice(0, -1), tenantId, id],
@@ -88,9 +91,21 @@ export function ConfigEditor({ kind, id }: { kind: Kind; id?: string }) {
         string,
         FormValue
       >);
-      setLocationIds("locations" in query.data ? query.data.locations?.map((x) => x.id) ?? [] : []);
-      setProviderIds("providers" in query.data ? query.data.providers?.map((x) => x.id) ?? [] : []);
-      setServiceIds("services" in query.data ? query.data.services?.map((x) => x.id) ?? [] : []);
+      setLocationIds(
+        "locations" in query.data
+          ? (query.data.locations?.map((x) => x.id) ?? [])
+          : [],
+      );
+      setProviderIds(
+        "providers" in query.data
+          ? (query.data.providers?.map((x) => x.id) ?? [])
+          : [],
+      );
+      setServiceIds(
+        "services" in query.data
+          ? (query.data.services?.map((x) => x.id) ?? [])
+          : [],
+      );
     }
     if (query.data && "businessHours" in query.data && query.data.businessHours)
       setHours(query.data.businessHours);
@@ -99,17 +114,26 @@ export function ConfigEditor({ kind, id }: { kind: Kind; id?: string }) {
   const save = useMutation({
     mutationFn: async () => {
       const basePayload = payloadFor(kind, form, Boolean(id));
-      const payload = id ? {
-        ...basePayload,
-        ...(kind === "providers" ? { locationIds, serviceIds } : {}),
-        ...(kind === "services" ? { locationIds, providerIds } : {}),
-        ...(kind === "locations" ? {
-          serviceIds,
-          businessHours: hours.map(({ dayOfWeek, isClosed, openTime, closeTime }) => ({
-            dayOfWeek, isClosed, openTime, closeTime,
-          })),
-        } : {}),
-      } : basePayload;
+      const payload = id
+        ? {
+            ...basePayload,
+            ...(kind === "providers" ? { locationIds, serviceIds } : {}),
+            ...(kind === "services" ? { locationIds, providerIds } : {}),
+            ...(kind === "locations"
+              ? {
+                  serviceIds,
+                  businessHours: hours.map(
+                    ({ dayOfWeek, isClosed, openTime, closeTime }) => ({
+                      dayOfWeek,
+                      isClosed,
+                      openTime,
+                      closeTime,
+                    }),
+                  ),
+                }
+              : {}),
+          }
+        : basePayload;
       const value = await tenantApiRequest<{ id: string }>(
         id ? `/${kind}/${id}/edit` : `/${kind}`,
         tenantId,
@@ -119,17 +143,34 @@ export function ConfigEditor({ kind, id }: { kind: Kind; id?: string }) {
     },
     onSuccess: async (value) => {
       await Promise.all(
-        ["locations", "location", "providers", "provider", "services", "service"].map(
-          (resource) => client.invalidateQueries({ queryKey: [resource, tenantId] }),
+        [
+          "locations",
+          "location",
+          "providers",
+          "provider",
+          "services",
+          "service",
+        ].map((resource) =>
+          client.invalidateQueries({ queryKey: [resource, tenantId] }),
         ),
       );
       router.push(`/${kind}/${id || value.id}`);
     },
     onError: (error) => {
+      const hoursConflict =
+        kind === "locations" ? locationHoursConflictMessage(error) : undefined;
+      if (hoursConflict) {
+        setSaveError(hoursConflict);
+        setValidationErrors({});
+        requestAnimationFrame(() =>
+          document.getElementById("config-save-error")?.focus(),
+        );
+        return;
+      }
       const mapped = mapApiFieldErrors(error, editorFields);
       const mappedErrors = Object.fromEntries(
-        Object.entries(mapped).filter(
-          (entry): entry is [string, string] => Boolean(entry[1]),
+        Object.entries(mapped).filter((entry): entry is [string, string] =>
+          Boolean(entry[1]),
         ),
       );
       if (Object.keys(mappedErrors).length) {
@@ -280,7 +321,9 @@ export function ConfigEditor({ kind, id }: { kind: Kind; id?: string }) {
                     disabled={!editable}
                     value={String(form.countryCode ?? "")}
                     error={validationErrors.countryCode}
-                    onChange={(countryCode) => changeField("countryCode", countryCode)}
+                    onChange={(countryCode) =>
+                      changeField("countryCode", countryCode)
+                    }
                   />
                   {field("escalationPhoneNumber", "Escalation Phone Number", {
                     placeholder: "+13055550124",
@@ -413,12 +456,27 @@ export function ConfigEditor({ kind, id }: { kind: Kind; id?: string }) {
               </CardContent>
             </Card>
           )}
-          {id && <Relations kind={kind} editable={editable}
-            locationIds={locationIds} providerIds={providerIds} serviceIds={serviceIds}
-            onLocationsChange={setLocationIds} onProvidersChange={setProviderIds}
-            onServicesChange={setServiceIds} />}{" "}
+          {id && (
+            <Relations
+              kind={kind}
+              editable={editable}
+              locationIds={locationIds}
+              providerIds={providerIds}
+              serviceIds={serviceIds}
+              onLocationsChange={setLocationIds}
+              onProvidersChange={setProviderIds}
+              onServicesChange={setServiceIds}
+            />
+          )}{" "}
           {saveError && (
-            <p role="alert" className="text-sm text-destructive">{saveError}</p>
+            <p
+              id="config-save-error"
+              tabIndex={-1}
+              role="alert"
+              className="whitespace-pre-line text-sm text-destructive"
+            >
+              {saveError}
+            </p>
           )}
           {editable && (
             <div className="flex flex-wrap gap-2">
@@ -441,10 +499,23 @@ export function ConfigEditor({ kind, id }: { kind: Kind; id?: string }) {
     </AppShell>
   );
 }
-function Relations({ kind, editable, locationIds, providerIds, serviceIds,
-  onLocationsChange, onProvidersChange, onServicesChange }: {
-  kind: Kind; editable: boolean; locationIds: string[]; providerIds: string[]; serviceIds: string[];
-  onLocationsChange: (ids: string[]) => void; onProvidersChange: (ids: string[]) => void;
+function Relations({
+  kind,
+  editable,
+  locationIds,
+  providerIds,
+  serviceIds,
+  onLocationsChange,
+  onProvidersChange,
+  onServicesChange,
+}: {
+  kind: Kind;
+  editable: boolean;
+  locationIds: string[];
+  providerIds: string[];
+  serviceIds: string[];
+  onLocationsChange: (ids: string[]) => void;
+  onProvidersChange: (ids: string[]) => void;
   onServicesChange: (ids: string[]) => void;
 }) {
   return (
@@ -458,13 +529,17 @@ function Relations({ kind, editable, locationIds, providerIds, serviceIds,
             <AssignmentManager
               targetType="locations"
               title="Locations"
-              selected={locationIds} onChange={onLocationsChange} editable={editable}
+              selected={locationIds}
+              onChange={onLocationsChange}
+              editable={editable}
             />
             <div className="border-t" />
             <AssignmentManager
               targetType="services"
               title="Services"
-              selected={serviceIds} onChange={onServicesChange} editable={editable}
+              selected={serviceIds}
+              onChange={onServicesChange}
+              editable={editable}
             />
           </>
         )}
@@ -472,7 +547,9 @@ function Relations({ kind, editable, locationIds, providerIds, serviceIds,
           <AssignmentManager
             targetType="services"
             title="Services"
-            selected={serviceIds} onChange={onServicesChange} editable={editable}
+            selected={serviceIds}
+            onChange={onServicesChange}
+            editable={editable}
           />
         )}
         {kind === "services" && (
@@ -480,13 +557,17 @@ function Relations({ kind, editable, locationIds, providerIds, serviceIds,
             <AssignmentManager
               targetType="locations"
               title="Locations"
-              selected={locationIds} onChange={onLocationsChange} editable={editable}
+              selected={locationIds}
+              onChange={onLocationsChange}
+              editable={editable}
             />
             <div className="border-t" />
             <AssignmentManager
               targetType="providers"
               title="Providers"
-              selected={providerIds} onChange={onProvidersChange} editable={editable}
+              selected={providerIds}
+              onChange={onProvidersChange}
+              editable={editable}
             />
           </>
         )}
@@ -561,9 +642,21 @@ const fieldLabels: Record<string, string> = {
 
 const editorFields = Object.keys(fieldLabels);
 const focusFields = [
-  "firstName", "lastName", "name", "description", "durationMinutes",
-  "name", "phone", "email", "timezone", "addressLine1", "addressLine2",
-  "city", "stateProvince", "postalCode", "countryCode",
+  "firstName",
+  "lastName",
+  "name",
+  "description",
+  "durationMinutes",
+  "name",
+  "phone",
+  "email",
+  "timezone",
+  "addressLine1",
+  "addressLine2",
+  "city",
+  "stateProvince",
+  "postalCode",
+  "countryCode",
   "escalationPhoneNumber",
 ] as const;
 
@@ -600,8 +693,7 @@ export function validateLocation(form: Record<string, FormValue>) {
     String(form.escalationPhoneNumber ?? ""),
   );
   if (escalationPhone && !/^\+[1-9]\d{7,14}$/.test(escalationPhone))
-    errors.escalationPhoneNumber =
-      "Enter a valid international phone number.";
+    errors.escalationPhoneNumber = "Enter a valid international phone number.";
   return errors;
 }
 
@@ -609,13 +701,16 @@ export function validateEditor(kind: Kind, form: Record<string, FormValue>) {
   if (kind === "locations") return validateLocation(form);
   const errors: Record<string, string> = {};
   if (kind === "providers") {
-    if (!String(form.firstName ?? "").trim()) errors.firstName = "First Name is required.";
-    if (!String(form.lastName ?? "").trim()) errors.lastName = "Last Name is required.";
+    if (!String(form.firstName ?? "").trim())
+      errors.firstName = "First Name is required.";
+    if (!String(form.lastName ?? "").trim())
+      errors.lastName = "Last Name is required.";
     const phone = normalizeInternationalPhone(String(form.phone ?? ""));
     if (phone && !/^\+[1-9]\d{7,14}$/.test(phone))
       errors.phone = "Enter a valid international phone number.";
   } else {
-    if (!String(form.name ?? "").trim()) errors.name = "Service Name is required.";
+    if (!String(form.name ?? "").trim())
+      errors.name = "Service Name is required.";
     const duration = Number(form.durationMinutes);
     if (!Number.isInteger(duration) || duration < 1 || duration > 1440)
       errors.durationMinutes = "Duration must be between 1 and 1440 minutes.";

@@ -10,6 +10,7 @@ import { PageHeader } from "@/components/common/page-header";
 import { ErrorState, LoadingState } from "@/components/feedback/states";
 import { StatusBadge } from "@/components/common/status-badge";
 import { Button } from "@/components/ui/button";
+import { ProviderSchedule } from "@/components/clinic/provider-schedule";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   BusinessHour,
@@ -200,40 +201,43 @@ function LocationDetail({ value }: { value: Location }) {
 
 function ProviderDetail({ value }: { value: Provider }) {
   return (
-    <div className="grid gap-4 lg:grid-cols-2">
-      <Section title="Provider Information">
-        <Details
-          rows={[
-            ["Display Name", value.displayName],
-            ["First Name", value.firstName],
-            ["Last Name", value.lastName],
-            ["Title", value.title],
-          ]}
-        />
-      </Section>
-      <Section title="Contact Information">
-        <Details
-          rows={[
-            ["Email", value.email],
-            ["Phone", value.phone],
-          ]}
-        />
-      </Section>
-      <Section title="Assigned Locations">
-        <Related
-          items={value.locations ?? []}
-          kind="locations"
-          empty="No Locations Assigned"
-        />
-      </Section>
-      <Section title="Assigned Services">
-        <Related
-          items={value.services ?? []}
-          kind="services"
-          empty="No Services Assigned"
-        />
-      </Section>
-      <Metadata value={value} />
+    <div className="space-y-6">
+      <div className="grid gap-4 lg:grid-cols-2">
+        <Section title="Provider Information">
+          <Details
+            rows={[
+              ["Display Name", value.displayName],
+              ["First Name", value.firstName],
+              ["Last Name", value.lastName],
+              ["Title", value.title],
+            ]}
+          />
+        </Section>
+        <Section title="Contact Information">
+          <Details
+            rows={[
+              ["Email", value.email],
+              ["Phone", value.phone],
+            ]}
+          />
+        </Section>
+        <Section title="Assigned Locations">
+          <Related
+            items={value.locations ?? []}
+            kind="locations"
+            empty="No Locations Assigned"
+          />
+        </Section>
+        <Section title="Assigned Services">
+          <Related
+            items={value.services ?? []}
+            kind="services"
+            empty="No Services Assigned"
+          />
+        </Section>
+        <Metadata value={value} />
+      </div>
+      <ProviderSchedule providerId={value.id} />
     </div>
   );
 }

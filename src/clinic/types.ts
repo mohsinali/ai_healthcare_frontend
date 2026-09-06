@@ -16,6 +16,30 @@ export interface BusinessHour {
   openTime: string | null;
   closeTime: string | null;
 }
+export const WEEKDAYS = [
+  "MONDAY",
+  "TUESDAY",
+  "WEDNESDAY",
+  "THURSDAY",
+  "FRIDAY",
+  "SATURDAY",
+  "SUNDAY",
+] as const;
+export type DayOfWeek = (typeof WEEKDAYS)[number];
+export interface ProviderWorkingPeriod {
+  dayOfWeek: DayOfWeek;
+  startTime: string;
+  endTime: string;
+  isActive: boolean;
+}
+export interface ProviderScheduleLocation {
+  id: string;
+  name: string;
+  timezone: string;
+  status: ConfigStatus;
+  businessHours: BusinessHour[];
+  periods: ProviderWorkingPeriod[];
+}
 export interface Location {
   id: string;
   locationNumber: string;
