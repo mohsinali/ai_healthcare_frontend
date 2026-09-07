@@ -85,3 +85,10 @@ Add each exact website origin using `scheme://hostname[:port]`, select an active
 The installation snippet uses `NEXT_PUBLIC_WIDGET_LOADER_BASE_URL` as the controlled public origin serving `/voice-widget/embed.js`. Set this to an origin only (for example `https://app.careflow.example`) in production. When unset in local development, the page safely uses its browser origin after hydration. It never uses the backend-only `CAREFLOW_API_BASE_URL` and withholds the snippet when no valid base is available.
 
 The `wgt_…` widget key in the copied script is intentionally public and is still protected by exact-origin authorization. It is not an ElevenLabs API key, gateway credential, signed URL, or session token. Never put private credentials on the clinic website. Widget-key rotation is not currently supported. Installed widgets remain public runtime clients and never require Super Admin authentication.
+
+New tenants do not receive a copied loader. They receive an inactive database
+channel with a server-generated public key, no location, and an empty origin
+allowlist. A Super Admin completes the tenant readiness checklist, associates a
+real location, configures exact origins, and enables the channel before using
+the dynamically generated installation snippet. Clinic roles cannot access
+provisioning status, widget keys, snippets, or channel management.

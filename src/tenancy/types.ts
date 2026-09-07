@@ -12,6 +12,22 @@ export interface PlatformTenant {
   memberCount?: number;
   createdAt: string;
   updatedAt: string;
+  provisioning?: TenantProvisioningSummary | null;
+}
+export interface TenantProvisioningSummary {
+  baselineComplete: boolean;
+  createdWebVoiceChannel: boolean;
+  webVoiceChannelId: string;
+  webVoiceChannelStatus: "ACTIVE" | "INACTIVE";
+  readiness: {
+    state:
+      | "CLINIC_SETUP_INCOMPLETE"
+      | "VOICE_CONFIGURATION_INCOMPLETE"
+      | "READY_TO_ACTIVATE"
+      | "ACTIVE";
+    required: Array<{ key: string; complete: boolean; label: string }>;
+    recommended: Array<{ key: string; complete: boolean; label: string }>;
+  };
 }
 export interface PaginatedTenants {
   data: PlatformTenant[];

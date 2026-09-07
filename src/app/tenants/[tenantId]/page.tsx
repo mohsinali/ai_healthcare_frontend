@@ -27,10 +27,13 @@ const badge = {
 } as const;
 export default function TenantDetailPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ tenantId: string }>;
+  searchParams: Promise<{ created?: string }>;
 }) {
   const { tenantId } = use(params);
+  const query = use(searchParams);
   const client = useQueryClient();
   const [tab, setTab] = useState<"overview" | "members">("overview");
   const [name, setName] = useState("");
@@ -73,6 +76,14 @@ export default function TenantDetailPage({
       }),
     onSuccess: () =>
       client.invalidateQueries({ queryKey: ["platform", "tenant", tenantId] }),
+  });
+  const repairProvisioning = useMutation({
+    mutationFn: () =>
+      apiRequest(`/tenants/${tenantId}/provisioning`, { method: "POST" }),
+    onSuccess: () =>
+      client.invalidateQueries({
+        queryKey: ["platform", "tenant", tenantId],
+      }),
   });
   const add = useMutation({
     mutationFn: () =>
@@ -136,6 +147,63 @@ export default function TenantDetailPage({
                 </div>
               }
             />
+            {query.created === "1" && (
+              <Card className="border-success/40 bg-success/5">
+                <CardContent className="p-4 text-sm">
+                  Tenant created successfully. Baseline provisioning completed;
+                  the Voice Assistant channel was created disabled.
+                </CardContent>
+              </Card>
+            )}
+            <Card>
+              <CardHeader>
+                <CardTitle>Setup readiness</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {!tenant.data.provisioning ? (
+                  <div className="space-y-3">
+                    <p className="text-sm text-warning">
+                      Baseline provisioning is missing. Repair it before
+                      configuring this tenant.
+                    </p>
+                    <Button
+                      size="sm"
+                      loading={repairProvisioning.isPending}
+                      onClick={() => repairProvisioning.mutate()}
+                    >
+                      Repair baseline provisioning
+                    </Button>
+                    {repairProvisioning.error && (
+                      <p className="text-sm text-destructive">
+                        {repairProvisioning.error.message}
+                      </p>
+                    )}
+                  </div>
+                ) : (
+                  <>
+                    <p className="text-sm text-muted-foreground">
+                      {tenant.data.provisioning.readiness.state
+                        .toLowerCase()
+                        .replaceAll("_", " ")}
+                    </p>
+                    <div className="grid gap-2 md:grid-cols-2">
+                      {tenant.data.provisioning.readiness.required.map(
+                        (item) => (
+                          <div key={item.key} className="text-sm">
+                            {item.complete ? "✓" : "○"} {item.label}
+                          </div>
+                        ),
+                      )}
+                    </div>
+                    <Button asChild variant="outline" size="sm">
+                      <Link href={`/tenants/${tenantId}/voice-assistant`}>
+                        <AudioWaveform /> Configure Voice Assistant
+                      </Link>
+                    </Button>
+                  </>
+                )}
+              </CardContent>
+            </Card>
             <div className="flex gap-1 border-b">
               <Button
                 variant={tab === "overview" ? "secondary" : "ghost"}

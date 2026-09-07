@@ -1,6 +1,7 @@
 "use client";
 import { FormEvent, useEffect, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Building2,
@@ -24,7 +25,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { PaginatedTenants } from "@/tenancy/types";
+import { PaginatedTenants, PlatformTenant } from "@/tenancy/types";
 const statusVariant = {
   ACTIVE: "success",
   SUSPENDED: "warning",
@@ -37,6 +38,7 @@ const slugify = (value: string) =>
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-|-$/g, "");
 export default function TenantsPage() {
+  const router = useRouter();
   const client = useQueryClient();
   const [page, setPage] = useState(1);
   const [input, setInput] = useState("");
@@ -62,16 +64,17 @@ export default function TenantsPage() {
   });
   const create = useMutation({
     mutationFn: () =>
-      apiRequest("/tenants", {
+      apiRequest<PlatformTenant>("/tenants", {
         method: "POST",
         body: JSON.stringify({ name, slug }),
       }),
-    onSuccess: async () => {
+    onSuccess: async (tenant) => {
       setOpen(false);
       setName("");
       setSlug("");
       setSlugEdited(false);
       await client.invalidateQueries({ queryKey: ["platform", "tenants"] });
+      router.push(`/tenants/${tenant.id}?created=1`);
     },
   });
   function submit(event: FormEvent) {
