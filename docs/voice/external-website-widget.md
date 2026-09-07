@@ -75,3 +75,13 @@ An empty list permits no external embedding.
 After configuration, verify a real conversation and tool call, refresh and
 start a second session, confirm a non-allowed origin fails generically, and
 confirm the existing `/voice-agent/test` flow still works.
+
+# Administration
+
+Web Voice Channel management is available only to CareFlow Super Admins. A Super Admin opens a tenant and selects **Voice Assistant** (`/tenants/<tenant-id>/voice-assistant`) to perform setup for the client. Clinic owners, clinic administrators, receptionists, and other clinic users cannot view or configure channels or installation details. The API remains the authority for role checks and tenant isolation.
+
+Add each exact website origin using `scheme://hostname[:port]`, select an active location, save, and enable the channel. `www` and non-`www`, HTTP and HTTPS, and different ports are distinct origins; paths, queries, fragments, credentials, and wildcards are rejected. An empty allowlist blocks embedding.
+
+The installation snippet uses `NEXT_PUBLIC_WIDGET_LOADER_BASE_URL` as the controlled public origin serving `/voice-widget/embed.js`. Set this to an origin only (for example `https://app.careflow.example`) in production. When unset in local development, the page safely uses its browser origin after hydration. It never uses the backend-only `CAREFLOW_API_BASE_URL` and withholds the snippet when no valid base is available.
+
+The `wgt_…` widget key in the copied script is intentionally public and is still protected by exact-origin authorization. It is not an ElevenLabs API key, gateway credential, signed URL, or session token. Never put private credentials on the clinic website. Widget-key rotation is not currently supported. Installed widgets remain public runtime clients and never require Super Admin authentication.

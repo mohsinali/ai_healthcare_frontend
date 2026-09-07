@@ -1,7 +1,7 @@
 "use client";
 import { FormEvent, use, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft, Save, Search, UserPlus } from "lucide-react";
+import { ArrowLeft, AudioWaveform, Save, Search, UserPlus } from "lucide-react";
 import Link from "next/link";
 import { apiRequest } from "@/lib/api/client";
 import { tenantRoleLabel, TenantRole } from "@/auth/types";
@@ -122,10 +122,18 @@ export default function TenantDetailPage({
               title={tenant.data.name}
               description={tenant.data.slug}
               actions={
-                <StatusBadge variant={badge[tenant.data.status]}>
-                  {tenant.data.status[0] +
-                    tenant.data.status.slice(1).toLowerCase()}
-                </StatusBadge>
+                <div className="flex items-center gap-2">
+                  <Button asChild variant="outline">
+                    <Link href={`/tenants/${tenantId}/voice-assistant`}>
+                      <AudioWaveform />
+                      Voice Assistant
+                    </Link>
+                  </Button>
+                  <StatusBadge variant={badge[tenant.data.status]}>
+                    {tenant.data.status[0] +
+                      tenant.data.status.slice(1).toLowerCase()}
+                  </StatusBadge>
+                </div>
               }
             />
             <div className="flex gap-1 border-b">
