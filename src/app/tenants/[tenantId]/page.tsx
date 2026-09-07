@@ -1,7 +1,14 @@
 "use client";
 import { FormEvent, use, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft, AudioWaveform, Save, Search, UserPlus } from "lucide-react";
+import {
+  ArrowLeft,
+  AudioWaveform,
+  Eye,
+  EyeOff,
+  Save,
+  UserPlus,
+} from "lucide-react";
 import Link from "next/link";
 import { apiRequest } from "@/lib/api/client";
 import { tenantRoleLabel, TenantRole } from "@/auth/types";
@@ -18,7 +25,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { PlatformMembership, PlatformTenant, SafeUser } from "@/tenancy/types";
+import { PlatformMembership, PlatformTenant } from "@/tenancy/types";
 const roles: TenantRole[] = ["CLINIC_OWNER", "CLINIC_ADMIN", "RECEPTIONIST"];
 const badge = {
   ACTIVE: "success",
@@ -39,8 +46,13 @@ export default function TenantDetailPage({
   const [name, setName] = useState("");
   const [status, setStatus] = useState<PlatformTenant["status"]>("ACTIVE");
   const [initialized, setInitialized] = useState(false);
-  const [lookup, setLookup] = useState("");
-  const [selectedUser, setSelectedUser] = useState("");
+  const [memberEmail, setMemberEmail] = useState("");
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
+  const [temporaryPassword, setTemporaryPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [confirmationRequired, setConfirmationRequired] = useState(false);
+  const [memberSuccess, setMemberSuccess] = useState("");
   const [role, setRole] = useState<TenantRole>("RECEPTIONIST");
   const tenant = useQuery({
     queryKey: ["platform", "tenant", tenantId],
@@ -59,14 +71,6 @@ export default function TenantDetailPage({
     queryFn: () =>
       apiRequest<PlatformMembership[]>(`/tenants/${tenantId}/members`),
     enabled: tab === "members",
-  });
-  const users = useQuery({
-    queryKey: ["platform", "users", lookup],
-    queryFn: () =>
-      apiRequest<SafeUser[]>(
-        `/users/search?query=${encodeURIComponent(lookup)}`,
-      ),
-    enabled: lookup.trim().length >= 2,
   });
   const save = useMutation({
     mutationFn: () =>
@@ -87,18 +91,53 @@ export default function TenantDetailPage({
   });
   const add = useMutation({
     mutationFn: () =>
-      apiRequest(`/tenants/${tenantId}/members`, {
+      apiRequest<{
+        state: "created" | "confirmation_required";
+        message?: string;
+      }>(`/tenants/${tenantId}/members`, {
         method: "POST",
-        body: JSON.stringify({ userId: selectedUser, role }),
+        body: JSON.stringify({
+          email: memberEmail,
+          ...(firstName ? { firstName } : {}),
+          ...(lastName ? { lastName } : {}),
+          ...(temporaryPassword ? { temporaryPassword } : {}),
+          role,
+        }),
       }),
-    onSuccess: async () => {
-      setSelectedUser("");
-      setLookup("");
-      await client.invalidateQueries({
-        queryKey: ["platform", "tenant", tenantId],
-      });
+    onSuccess: async (result) => {
+      if (result.state === "confirmation_required") {
+        setTemporaryPassword("");
+        setConfirmationRequired(true);
+        setMemberSuccess("");
+        return;
+      }
+      await memberAdded("Member created successfully.");
     },
   });
+  const confirmExisting = useMutation({
+    mutationFn: () =>
+      apiRequest(`/tenants/${tenantId}/members/confirm-existing`, {
+        method: "POST",
+        body: JSON.stringify({ email: memberEmail, role }),
+      }),
+    onSuccess: () => memberAdded("Existing account added successfully."),
+  });
+  async function memberAdded(message: string) {
+    setMemberEmail("");
+    setFirstName("");
+    setLastName("");
+    setTemporaryPassword("");
+    setConfirmationRequired(false);
+    setMemberSuccess(message);
+    await Promise.all([
+      client.invalidateQueries({
+        queryKey: ["platform", "tenant", tenantId],
+      }),
+      client.invalidateQueries({
+        queryKey: ["platform", "tenant", tenantId, "members"],
+      }),
+    ]);
+  }
   const updateMember = useMutation({
     mutationFn: ({ id, data }: { id: string; data: object }) =>
       apiRequest(`/tenants/${tenantId}/members/${id}`, {
@@ -110,7 +149,7 @@ export default function TenantDetailPage({
   });
   function addMember(event: FormEvent) {
     event.preventDefault();
-    if (selectedUser) add.mutate();
+    if (!add.isPending && !confirmExisting.isPending) add.mutate();
   }
   return (
     <AppShell>
@@ -310,7 +349,7 @@ export default function TenantDetailPage({
                     ) : !members.data?.length ? (
                       <EmptyState
                         title="No Members"
-                        description="Add an existing application user to this tenant."
+                        description="Create a new account or add an existing CareFlow account to this tenant."
                       />
                     ) : (
                       <div className="overflow-x-auto">
@@ -397,65 +436,107 @@ export default function TenantDetailPage({
                 </Card>
                 <Card>
                   <CardHeader>
-                    <CardTitle>Add Member</CardTitle>
+                    <CardTitle>Create or Add Member</CardTitle>
                   </CardHeader>
                   <CardContent>
                     <form onSubmit={addMember} className="space-y-4">
                       <div className="space-y-2">
-                        <Label htmlFor="user-search">Find Existing User</Label>
-                        <div className="relative">
-                          <Search className="absolute left-3 top-2.5 size-4 text-muted-foreground" />
-                          <Input
-                            id="user-search"
-                            value={lookup}
-                            onChange={(event) => {
-                              setLookup(event.target.value);
-                              setSelectedUser("");
-                            }}
-                            className="pl-9"
-                            placeholder="Name or email"
-                          />
-                        </div>
+                        <Label htmlFor="member-email">Email *</Label>
+                        <Input
+                          id="member-email"
+                          type="email"
+                          required
+                          value={memberEmail}
+                          onChange={(event) => {
+                            setMemberEmail(event.target.value);
+                            setConfirmationRequired(false);
+                            setMemberSuccess("");
+                          }}
+                          placeholder="member@example.com"
+                          autoComplete="off"
+                        />
                       </div>
-                      {users.data && lookup.length >= 2 && (
-                        <div className="max-h-40 overflow-auto rounded-md border">
-                          {users.data.length ? (
-                            users.data.map((user) => (
+                      {!confirmationRequired && (
+                        <>
+                          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-1">
+                            <div className="space-y-2">
+                              <Label htmlFor="member-first-name">
+                                First Name (required for a new account)
+                              </Label>
+                              <Input
+                                id="member-first-name"
+                                value={firstName}
+                                onChange={(event) =>
+                                  setFirstName(event.target.value)
+                                }
+                                autoComplete="off"
+                              />
+                            </div>
+                            <div className="space-y-2">
+                              <Label htmlFor="member-last-name">
+                                Last Name (required for a new account)
+                              </Label>
+                              <Input
+                                id="member-last-name"
+                                value={lastName}
+                                onChange={(event) =>
+                                  setLastName(event.target.value)
+                                }
+                                autoComplete="off"
+                              />
+                            </div>
+                          </div>
+                          <div className="space-y-2">
+                            <Label htmlFor="temporary-password">
+                              Temporary Password (required for a new account)
+                            </Label>
+                            <div className="relative">
+                              <Input
+                                id="temporary-password"
+                                type={showPassword ? "text" : "password"}
+                                minLength={12}
+                                value={temporaryPassword}
+                                onChange={(event) =>
+                                  setTemporaryPassword(event.target.value)
+                                }
+                                className="pr-10"
+                                autoComplete="new-password"
+                              />
                               <button
                                 type="button"
-                                onClick={() => {
-                                  setSelectedUser(user.id);
-                                  setLookup(
-                                    `${user.firstName} ${user.lastName} (${user.email})`,
-                                  );
-                                }}
-                                key={user.id}
-                                className={`block w-full border-b p-2 text-left text-sm last:border-0 hover:bg-muted ${selectedUser === user.id ? "bg-accent" : ""}`}
+                                aria-label={
+                                  showPassword
+                                    ? "Hide temporary password"
+                                    : "Show temporary password"
+                                }
+                                onClick={() =>
+                                  setShowPassword((value) => !value)
+                                }
+                                className="absolute right-3 top-2.5 text-muted-foreground"
                               >
-                                <span className="font-medium">
-                                  {user.firstName} {user.lastName}
-                                </span>
-                                <br />
-                                <span className="text-xs text-muted-foreground">
-                                  {user.email} · {user.status}
-                                </span>
+                                {showPassword ? (
+                                  <EyeOff className="size-4" />
+                                ) : (
+                                  <Eye className="size-4" />
+                                )}
                               </button>
-                            ))
-                          ) : (
-                            <p className="p-3 text-sm text-muted-foreground">
-                              No users found.
+                            </div>
+                            <p className="text-xs text-muted-foreground">
+                              Used only if this email is not registered. Minimum
+                              12 characters.
                             </p>
-                          )}
-                        </div>
+                          </div>
+                        </>
                       )}
                       <div className="space-y-2">
                         <Label htmlFor="role">Tenant Role</Label>
                         <select
                           id="role"
                           value={role}
-                          onChange={(event) =>
-                            setRole(event.target.value as TenantRole)
-                          }
+                          onChange={(event) => {
+                            setRole(event.target.value as TenantRole);
+                            setConfirmationRequired(false);
+                          }}
                           className="h-10 w-full rounded-md border bg-background px-3 text-sm"
                         >
                           {roles.map((value) => (
@@ -465,19 +546,48 @@ export default function TenantDetailPage({
                           ))}
                         </select>
                       </div>
-                      {add.error && (
+                      {confirmationRequired && (
+                        <div
+                          role="status"
+                          className="space-y-3 rounded-md border border-warning/40 bg-warning/5 p-3 text-sm"
+                        >
+                          <p>
+                            This email belongs to an existing CareFlow account.
+                            Confirm that you want to add the account to this
+                            tenant. The account’s profile and password will not
+                            be changed.
+                          </p>
+                          <Button
+                            type="button"
+                            className="w-full"
+                            loading={confirmExisting.isPending}
+                            disabled={add.isPending}
+                            onClick={() => confirmExisting.mutate()}
+                          >
+                            <UserPlus /> Add Existing Account
+                          </Button>
+                        </div>
+                      )}
+                      {(add.error || confirmExisting.error) && (
                         <p className="text-sm text-destructive">
-                          {add.error.message}
+                          {(add.error || confirmExisting.error)?.message}
                         </p>
                       )}
-                      <Button
-                        className="w-full"
-                        disabled={!selectedUser}
-                        loading={add.isPending}
-                      >
-                        <UserPlus />
-                        Add Member
-                      </Button>
+                      {memberSuccess && (
+                        <p role="status" className="text-sm text-success">
+                          {memberSuccess}
+                        </p>
+                      )}
+                      {!confirmationRequired && (
+                        <Button
+                          className="w-full"
+                          disabled={confirmExisting.isPending}
+                          loading={add.isPending}
+                        >
+                          <UserPlus />
+                          Create Member
+                        </Button>
+                      )}
                     </form>
                   </CardContent>
                 </Card>
