@@ -15,6 +15,29 @@ Add the loader to the customer website with the channel's public widget key:
 The `wgt_` value is a public routing identifier, not a secret. Each channel must
 still be restricted to its explicitly configured embedding origins.
 
+## Visitor experience
+
+The loader adds a polished **Talk to our assistant** launcher fixed 24 pixels
+from the bottom-right of the viewport. It is isolated in Shadow DOM, so customer
+website button styles and box-sizing rules cannot alter it, and it does not add
+global CSS or take up space in the page layout. On narrow screens it becomes a
+52-pixel circular microphone control, uses smaller safe-area-aware edge spacing,
+and retains the same accessible name.
+
+Activating the launcher changes it to a disabled **Connecting…** state while the
+secure session and official ElevenLabs component load. On success the CareFlow
+launcher is hidden and the official ElevenLabs panel appears. On failure, a
+privacy-safe unavailable message and a deliberate **Try again** action are
+shown; there is no automatic retry.
+
+The launcher is a semantic button with a visible keyboard focus indicator,
+Enter and Space activation, a 44-pixel-or-larger touch target, live loading and
+failure announcements, and reduced-motion support. Loading the page never
+starts a call, plays audio, or requests microphone access. Session bootstrap
+still requires the visitor to activate the CareFlow launcher, and call or
+microphone initiation remains a deliberate interaction with the official
+ElevenLabs interface. No custom CSS or additional assets are required.
+
 ## Architecture and security
 
 `public/voice-widget/embed.js` is a dependency-free loader at a stable public

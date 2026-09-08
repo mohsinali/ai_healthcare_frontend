@@ -36,10 +36,20 @@ function executeLoader() {
 
 async function start() {
   executeLoader();
-  (document.querySelector("[data-careflow-voice-widget] button") as HTMLElement).click();
+  launcher().click();
   await vi.waitFor(() => {
-    expect(document.querySelector("elevenlabs-convai")).not.toBeNull();
+    expect(shadow().querySelector("elevenlabs-convai")).not.toBeNull();
   });
+}
+
+function shadow() {
+  return document.querySelector<HTMLElement>(
+    '[data-careflow-voice-widget="launcher"]',
+  )!.shadowRoot!;
+}
+
+function launcher() {
+  return shadow().querySelector<HTMLButtonElement>(".cfvw-launcher")!;
 }
 
 beforeEach(() => {
@@ -85,7 +95,7 @@ describe("CareFlow external voice widget loader", () => {
     executeLoader();
     expect(fetch).not.toHaveBeenCalled();
     expect(document.body).toHaveTextContent(
-      "Voice assistant is currently unavailable.",
+      "Voice assistant is unavailable.",
     );
   });
 
@@ -96,7 +106,7 @@ describe("CareFlow external voice widget loader", () => {
       executeLoader();
       expect(fetch).not.toHaveBeenCalled();
       expect(document.body).toHaveTextContent(
-        "Voice assistant is currently unavailable.",
+        "Voice assistant is unavailable.",
       );
     },
   );
@@ -120,10 +130,54 @@ describe("CareFlow external voice widget loader", () => {
     expect(JSON.parse(String(init.body))).toEqual({ widgetKey });
   });
 
+  it("creates an isolated, fixed, accessible launcher", () => {
+    document.head.appendChild(document.createElement("style")).textContent =
+      "button { all: unset; position: static !important; }";
+    addLoader();
+    executeLoader();
+
+    expect(document.body).not.toHaveTextContent("Start voice assistant");
+    expect(launcher()).toHaveAccessibleName("Talk to our assistant");
+    expect(launcher().type).toBe("button");
+    expect(shadow().querySelector("style")!.textContent).toContain(
+      "position:fixed",
+    );
+    expect(shadow().querySelector("style")!.textContent).toContain(
+      "right:max(24px",
+    );
+    expect(shadow().querySelector("style")!.textContent).toContain(
+      "bottom:max(24px",
+    );
+    expect(shadow().querySelector("style")!.textContent).toContain(
+      "@media(max-width:480px)",
+    );
+    expect(shadow().querySelector("style")!.textContent).toContain(
+      "prefers-reduced-motion:reduce",
+    );
+    expect(document.head.querySelectorAll("style")).toHaveLength(1);
+  });
+
+  it("shows loading state and prevents duplicate activation", async () => {
+    let resolveFetch!: (response: Response) => void;
+    vi.mocked(fetch).mockImplementation(
+      () => new Promise((resolve) => { resolveFetch = resolve; }),
+    );
+    addLoader();
+    executeLoader();
+    launcher().click();
+    launcher().click();
+    expect(launcher()).toBeDisabled();
+    expect(launcher()).toHaveAttribute("aria-busy", "true");
+    expect(launcher()).toHaveAccessibleName("Connecting…");
+    expect(fetch).toHaveBeenCalledTimes(1);
+    resolveFetch(new Response(JSON.stringify(session), { status: 200 }));
+    await vi.waitFor(() => expect(shadow().querySelector(WIDGET_TAG)).not.toBeNull());
+  });
+
   it("uses signed-url and connects with dynamic variables already present", async () => {
     addLoader();
     await start();
-    const widget = document.querySelector("elevenlabs-convai")!;
+    const widget = shadow().querySelector("elevenlabs-convai")!;
     expect(widget.getAttribute("signed-url")).toBe(session.signedUrl);
     expect(widget).not.toHaveAttribute("agent-id");
     expect(JSON.parse(widget.getAttribute("dynamic-variables")!)).toEqual({
@@ -141,7 +195,7 @@ describe("CareFlow external voice widget loader", () => {
     executeLoader();
     await startExistingLoader();
     await vi.waitFor(() =>
-      expect(document.querySelector("elevenlabs-convai")).not.toBeNull(),
+      expect(shadow().querySelector("elevenlabs-convai")).not.toBeNull(),
     );
     expect(fetch).toHaveBeenCalledTimes(1);
     expect(
@@ -149,7 +203,8 @@ describe("CareFlow external voice widget loader", () => {
         'script[data-careflow-elevenlabs-widget="true"]',
       ),
     ).toHaveLength(1);
-    expect(document.querySelectorAll("elevenlabs-convai")).toHaveLength(1);
+    expect(shadow().querySelectorAll("elevenlabs-convai")).toHaveLength(1);
+    expect(launcher()).not.toBeVisible();
   });
 
   it("reuses an existing official script", async () => {
@@ -175,11 +230,12 @@ describe("CareFlow external voice widget loader", () => {
     executeLoader();
     await startExistingLoader();
     await vi.waitFor(() =>
-      expect(document.body).toHaveTextContent(
-        "Voice assistant is currently unavailable.",
+      expect(shadow().querySelector('[role="alert"]')).toHaveTextContent(
+        "Voice assistant is unavailable.",
       ),
     );
-    expect(document.querySelector("elevenlabs-convai")).toBeNull();
+    expect(shadow().querySelector("elevenlabs-convai")).toBeNull();
+    expect(shadow().querySelector(".cfvw-retry")).toBeVisible();
   });
 
   it("fails safely when the official script fails to load", async () => {
@@ -192,11 +248,31 @@ describe("CareFlow external voice widget loader", () => {
     executeLoader();
     await startExistingLoader();
     await vi.waitFor(() =>
-      expect(document.body).toHaveTextContent(
-        "Voice assistant is currently unavailable.",
+      expect(shadow().querySelector('[role="alert"]')).toHaveTextContent(
+        "Voice assistant is unavailable.",
       ),
     );
-    expect(document.querySelector("elevenlabs-convai")).toBeNull();
+    expect(shadow().querySelector("elevenlabs-convai")).toBeNull();
+  });
+
+  it("returns to an enabled launcher for a deliberate retry", async () => {
+    vi.mocked(fetch).mockResolvedValueOnce(new Response(null, { status: 503 }));
+    addLoader();
+    executeLoader();
+    await startExistingLoader();
+    await vi.waitFor(() =>
+      expect(shadow().querySelector<HTMLButtonElement>(".cfvw-retry")).toBeVisible(),
+    );
+    shadow().querySelector<HTMLButtonElement>(".cfvw-retry")!.click();
+    expect(launcher()).toBeVisible();
+    expect(launcher()).toBeEnabled();
+    expect(launcher()).toHaveAttribute("aria-busy", "false");
+    expect(fetch).toHaveBeenCalledTimes(1);
+    launcher().click();
+    await vi.waitFor(() =>
+      expect(shadow().querySelector("elevenlabs-convai")).not.toBeNull(),
+    );
+    expect(fetch).toHaveBeenCalledTimes(2);
   });
 
   it("does not expose credentials in text, logs, URLs, or storage", async () => {
@@ -205,8 +281,8 @@ describe("CareFlow external voice widget loader", () => {
     const localSet = vi.spyOn(Storage.prototype, "setItem");
     addLoader();
     await start();
-    expect(document.body.textContent).not.toContain(session.signedUrl);
-    expect(document.body.textContent).not.toContain(token);
+    expect(shadow().textContent).not.toContain(session.signedUrl);
+    expect(shadow().textContent).not.toContain(token);
     expect(location.href).not.toContain(token);
     expect(Array.from(document.querySelectorAll("script")).map((s) => s.src))
       .not.toContain(expect.stringContaining(token));
@@ -218,10 +294,10 @@ describe("CareFlow external voice widget loader", () => {
   it("cleans up the widget and listener on pagehide", async () => {
     addLoader();
     await start();
-    const widget = document.querySelector("elevenlabs-convai")!;
+    const widget = shadow().querySelector("elevenlabs-convai")!;
     const remove = vi.spyOn(widget, "removeEventListener");
     window.dispatchEvent(new Event("pagehide"));
-    expect(document.querySelector("elevenlabs-convai")).toBeNull();
+    expect(shadow().querySelector("elevenlabs-convai")).toBeNull();
     expect(remove).toHaveBeenCalledWith(
       "elevenlabs-convai:call",
       expect.any(Function),
@@ -230,6 +306,8 @@ describe("CareFlow external voice widget loader", () => {
 });
 
 async function startExistingLoader() {
-  (document.querySelector("[data-careflow-voice-widget] button") as HTMLElement).click();
+  launcher().click();
   await Promise.resolve();
 }
+
+const WIDGET_TAG = "elevenlabs-convai";
